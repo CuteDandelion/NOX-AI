@@ -252,27 +252,63 @@ class NOXApp {
         summaryEl.className = 'execution-item';
         summaryEl.style.marginBottom = '20px';
 
-        const status = execution.finished ? 'Completed' : 'Running';
-        const statusClass = execution.finished ? 'completed' : 'running';
+        const status = execution.finished ? 'completed' : 'running';
+        const statusText = execution.finished ? 'Completed' : 'Running';
 
-        summaryEl.innerHTML = `
-            <div class="node-header">
-                <div class="node-status ${statusClass}"></div>
-                <div class="node-name">Workflow Execution</div>
-            </div>
-            <div class="node-details">
-                Status: ${status}<br>
-                Started: ${new Date(execution.startedAt).toLocaleTimeString()}
-                ${execution.stoppedAt ? `<br>Finished: ${new Date(execution.stoppedAt).toLocaleTimeString()}` : ''}
+        const startTime = new Date(execution.startedAt).toLocaleTimeString();
+        const duration = execution.stoppedAt
+            ? `${Math.round((new Date(execution.stoppedAt) - new Date(execution.startedAt)) / 1000)}s`
+            : 'Running...';
+
+        const statsHtml = `
+            <div class="node-stats">
+                <div class="node-stat">
+                    <div class="node-stat-label">Status</div>
+                    <div class="node-stat-value">${statusText}</div>
+                </div>
+                <div class="node-stat">
+                    <div class="node-stat-label">Started</div>
+                    <div class="node-stat-value">${startTime}</div>
+                </div>
+                <div class="node-stat">
+                    <div class="node-stat-label">Duration</div>
+                    <div class="node-stat-value">${duration}</div>
+                </div>
+                ${execution.stoppedAt ? `
+                <div class="node-stat">
+                    <div class="node-stat-label">Finished</div>
+                    <div class="node-stat-value">${new Date(execution.stoppedAt).toLocaleTimeString()}</div>
+                </div>
+                ` : ''}
             </div>
         `;
 
+        summaryEl.innerHTML = `
+            <div class="node-header" data-node-id="summary">
+                <div class="node-status ${status}"></div>
+                <div class="node-name">Workflow Execution</div>
+                <svg class="node-expand-icon expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="node-details expanded" id="summary_details">
+                ${statsHtml}
+            </div>
+        `;
+
+        // Add click handler
+        const header = summaryEl.querySelector('.node-header');
+        header.addEventListener('click', () => this.toggleNodeDetails('summary'));
+
+        summaryEl.classList.add(status);
         this.executionContent.insertBefore(summaryEl, this.executionContent.firstChild);
     }
 
     addExecutionNode(nodeName, status, nodeData) {
+        const nodeId = `node_${nodeName.replace(/\s+/g, '_')}`;
         const nodeEl = document.createElement('div');
         nodeEl.className = `execution-item ${status}`;
+        nodeEl.dataset.nodeId = nodeId;
 
         const executionTime = nodeData.executionTime
             ? `${nodeData.executionTime}ms`
@@ -282,21 +318,79 @@ class NOXApp {
             ? new Date(nodeData.startTime).toLocaleTimeString()
             : 'N/A';
 
-        let details = `Execution time: ${executionTime}<br>Started: ${startTime}`;
+        // Build stats
+        const statsHtml = `
+            <div class="node-stats">
+                <div class="node-stat">
+                    <div class="node-stat-label">Duration</div>
+                    <div class="node-stat-value">${executionTime}</div>
+                </div>
+                <div class="node-stat">
+                    <div class="node-stat-label">Started</div>
+                    <div class="node-stat-value">${startTime}</div>
+                </div>
+                <div class="node-stat">
+                    <div class="node-stat-label">Status</div>
+                    <div class="node-stat-value">${status.toUpperCase()}</div>
+                </div>
+            </div>
+        `;
 
+        // Build logs if available
+        let logsHtml = '';
         if (nodeData.error) {
-            details += `<br><span style="color: #ef4444;">Error: ${this.escapeHtml(nodeData.error.message || 'Unknown error')}</span>`;
+            logsHtml = `
+                <div class="node-logs">
+                    <div class="node-log-title">Error Details</div>
+                    <div class="node-log-entry error">${this.escapeHtml(nodeData.error.message || 'Unknown error')}</div>
+                    ${nodeData.error.stack ? `<div class="node-log-entry error">${this.escapeHtml(nodeData.error.stack)}</div>` : ''}
+                </div>
+            `;
+        } else if (nodeData.data) {
+            // Show output data as logs
+            const outputData = JSON.stringify(nodeData.data, null, 2);
+            logsHtml = `
+                <div class="node-logs">
+                    <div class="node-log-title">Output Data</div>
+                    <div class="node-log-entry">${this.escapeHtml(outputData.substring(0, 500))}${outputData.length > 500 ? '...' : ''}</div>
+                </div>
+            `;
         }
 
         nodeEl.innerHTML = `
-            <div class="node-header">
+            <div class="node-header" data-node-id="${nodeId}">
                 <div class="node-status ${status}"></div>
                 <div class="node-name">${this.escapeHtml(nodeName)}</div>
+                <svg class="node-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
             </div>
-            <div class="node-details">${details}</div>
+            <div class="node-details" id="${nodeId}_details">
+                ${statsHtml}
+                ${logsHtml}
+            </div>
         `;
 
+        // Add click handler for expand/collapse
+        const header = nodeEl.querySelector('.node-header');
+        header.addEventListener('click', () => this.toggleNodeDetails(nodeId));
+
         this.executionContent.appendChild(nodeEl);
+    }
+
+    toggleNodeDetails(nodeId) {
+        const details = document.getElementById(`${nodeId}_details`);
+        const icon = document.querySelector(`[data-node-id="${nodeId}"] .node-expand-icon`);
+
+        if (details && icon) {
+            if (details.classList.contains('expanded')) {
+                details.classList.remove('expanded');
+                icon.classList.remove('expanded');
+            } else {
+                details.classList.add('expanded');
+                icon.classList.add('expanded');
+            }
+        }
     }
 
     toggleExecutionPanel() {
