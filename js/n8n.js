@@ -50,9 +50,10 @@ class N8NManager {
     /**
      * Send message to n8n webhook
      * @param {string} message - The message to send
+     * @param {Array} files - Optional files array
      * @returns {Promise<object>} - Response from n8n
      */
-    async sendMessage(message) {
+    async sendMessage(message, files = []) {
         if (!this.config.webhookUrl) {
             throw new Error('Webhook URL not configured. Please configure n8n settings.');
         }
@@ -66,6 +67,7 @@ class N8NManager {
                 },
                 body: JSON.stringify({
                     message: message,
+                    files: files,
                     timestamp: new Date().toISOString(),
                     sessionId: this.getSessionId()
                 })

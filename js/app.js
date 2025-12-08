@@ -1,6 +1,6 @@
 /**
  * NOX.AI Main Application
- * Coordinates chat interface and n8n integration
+ * Multi-modal chat with n8n integration
  */
 
 class NOXApp {
@@ -8,9 +8,17 @@ class NOXApp {
         this.chatMessages = null;
         this.chatInput = null;
         this.sendButton = null;
+        this.attachButton = null;
+        this.voiceButton = null;
+        this.fileInput = null;
+        this.attachedFiles = null;
         this.executionContent = null;
-        this.settingsPanel = null;
+        this.settingsModal = null;
         this.isProcessing = false;
+        this.isRecording = false;
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.files = [];
 
         this.init();
     }
@@ -28,24 +36,24 @@ class NOXApp {
         this.chatMessages = document.getElementById('chatMessages');
         this.chatInput = document.getElementById('chatInput');
         this.sendButton = document.getElementById('sendButton');
+        this.attachButton = document.getElementById('attachButton');
+        this.voiceButton = document.getElementById('voiceButton');
+        this.fileInput = document.getElementById('fileInput');
+        this.attachedFiles = document.getElementById('attachedFiles');
         this.executionContent = document.getElementById('executionContent');
-        this.settingsPanel = document.getElementById('settingsPanel');
+        this.settingsModal = document.getElementById('settingsModal');
 
         // Setup event listeners
         this.setupEventListeners();
-
-        // Setup n8n execution monitoring
         this.setupN8NMonitoring();
-
-        // Auto-resize textarea
         this.setupTextareaAutoResize();
+        this.renderChatList();
+        this.loadCurrentChat();
     }
 
     setupEventListeners() {
-        // Send message on button click
+        // Send message
         this.sendButton.addEventListener('click', () => this.sendMessage());
-
-        // Send message on Enter (Shift+Enter for new line)
         this.chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -53,18 +61,35 @@ class NOXApp {
             }
         });
 
-        // Settings panel
-        const settingsButton = document.getElementById('settingsButton');
-        const saveSettings = document.getElementById('saveSettings');
-        const cancelSettings = document.getElementById('cancelSettings');
+        // File attachment
+        this.attachButton.addEventListener('click', () => this.fileInput.click());
+        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
 
-        settingsButton.addEventListener('click', () => this.openSettings());
-        saveSettings.addEventListener('click', () => this.saveSettings());
-        cancelSettings.addEventListener('click', () => this.closeSettings());
+        // Voice input
+        this.voiceButton.addEventListener('click', () => this.toggleVoiceRecording());
+
+        // Chat management
+        document.getElementById('newChatBtn').addEventListener('click', () => this.createNewChat());
+        document.getElementById('chatList').addEventListener('click', (e) => this.handleChatListClick(e));
+
+        // Settings
+        document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
+        document.getElementById('closeSettings').addEventListener('click', () => this.closeSettings());
+        document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
+        document.getElementById('cancelSettings').addEventListener('click', () => this.closeSettings());
+
+        // Close modal on outside click
+        this.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.settingsModal) {
+                this.closeSettings();
+            }
+        });
 
         // Execution panel toggle
         const toggleExecution = document.getElementById('toggleExecution');
-        toggleExecution.addEventListener('click', () => this.toggleExecutionPanel());
+        if (toggleExecution) {
+            toggleExecution.addEventListener('click', () => this.toggleExecutionPanel());
+        }
     }
 
     setupTextareaAutoResize() {
@@ -75,107 +100,313 @@ class NOXApp {
     }
 
     setupN8NMonitoring() {
-        // Register callback for execution updates
         n8nManager.onExecutionUpdate((execution) => {
             this.updateExecutionDisplay(execution);
         });
     }
 
-    async sendMessage() {
-        const message = this.chatInput.value.trim();
+    // ==================== Chat Management ====================
 
-        if (!message || this.isProcessing) {
+    renderChatList() {
+        const chatList = document.getElementById('chatList');
+        const chats = chatManager.getAllChats();
+
+        chatList.innerHTML = chats.map(chat => `
+            <div class="chat-item ${chat.id === chatManager.currentChatId ? 'active' : ''}" data-chat-id="${chat.id}">
+                <span class="chat-item-title">${this.escapeHtml(chat.title)}</span>
+                <button class="chat-item-delete" data-chat-id="${chat.id}" title="Delete chat">×</button>
+            </div>
+        `).join('');
+    }
+
+    handleChatListClick(e) {
+        const chatItem = e.target.closest('.chat-item');
+        const deleteBtn = e.target.closest('.chat-item-delete');
+
+        if (deleteBtn) {
+            e.stopPropagation();
+            const chatId = deleteBtn.dataset.chatId;
+            if (confirm('Delete this chat?')) {
+                chatManager.deleteChat(chatId);
+                this.renderChatList();
+                this.loadCurrentChat();
+            }
+        } else if (chatItem) {
+            const chatId = chatItem.dataset.chatId;
+            chatManager.switchChat(chatId);
+            this.renderChatList();
+            this.loadCurrentChat();
+        }
+    }
+
+    createNewChat() {
+        chatManager.createNewChat();
+        this.renderChatList();
+        this.loadCurrentChat();
+        this.chatInput.focus();
+    }
+
+    loadCurrentChat() {
+        const messages = chatManager.getMessages();
+        this.chatMessages.innerHTML = '';
+
+        if (messages.length === 0) {
+            this.addSystemMessage('Welcome to NOX.AI. How can I help you today?');
+        } else {
+            messages.forEach(msg => {
+                this.displayMessage(msg);
+            });
+        }
+
+        this.scrollToBottom();
+    }
+
+    // ==================== File Handling ====================
+
+    handleFileSelect(e) {
+        const newFiles = Array.from(e.target.files);
+        this.files = [...this.files, ...newFiles];
+        this.renderAttachedFiles();
+        e.target.value = ''; // Reset input
+    }
+
+    renderAttachedFiles() {
+        if (this.files.length === 0) {
+            this.attachedFiles.style.display = 'none';
             return;
         }
 
-        // Add user message to chat
-        this.addMessage(message, 'user');
+        this.attachedFiles.style.display = 'flex';
+        this.attachedFiles.innerHTML = this.files.map((file, index) => `
+            <div class="attached-file">
+                ${this.getFileIcon(file.type)} ${this.escapeHtml(file.name)}
+                <button class="attached-file-remove" data-index="${index}">×</button>
+            </div>
+        `).join('');
+
+        // Add remove handlers
+        this.attachedFiles.querySelectorAll('.attached-file-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.dataset.index);
+                this.files.splice(index, 1);
+                this.renderAttachedFiles();
+            });
+        });
+    }
+
+    getFileIcon(type) {
+        if (type.startsWith('image/')) return '🖼️';
+        if (type === 'application/pdf') return '📄';
+        if (type.includes('text')) return '📝';
+        return '📎';
+    }
+
+    // ==================== Voice Recording ====================
+
+    async toggleVoiceRecording() {
+        if (!this.isRecording) {
+            await this.startRecording();
+        } else {
+            this.stopRecording();
+        }
+    }
+
+    async startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.mediaRecorder = new MediaRecorder(stream);
+            this.audioChunks = [];
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                this.audioChunks.push(event.data);
+            };
+
+            this.mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                const audioFile = new File([audioBlob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+                this.files.push(audioFile);
+                this.renderAttachedFiles();
+
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            this.mediaRecorder.start();
+            this.isRecording = true;
+            this.voiceButton.classList.add('recording');
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+            alert('Could not access microphone. Please check permissions.');
+        }
+    }
+
+    stopRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            this.voiceButton.classList.remove('recording');
+        }
+    }
+
+    // ==================== Messaging ====================
+
+    async sendMessage() {
+        const message = this.chatInput.value.trim();
+
+        if (!message && this.files.length === 0) {
+            return;
+        }
+
+        if (this.isProcessing) {
+            return;
+        }
+
+        // Create message object
+        const userMessage = {
+            role: 'user',
+            content: message,
+            files: this.files.map(f => ({ name: f.name, type: f.type, size: f.size }))
+        };
+
+        // Display user message
+        this.displayMessage(userMessage);
+        chatManager.addMessage(userMessage);
+        this.renderChatList();
 
         // Clear input
         this.chatInput.value = '';
         this.chatInput.style.height = 'auto';
 
+        // Prepare files for upload
+        const filesToSend = [...this.files];
+        this.files = [];
+        this.renderAttachedFiles();
+
         // Set processing state
         this.isProcessing = true;
         this.sendButton.disabled = true;
 
-        // Show loading indicator
+        // Show loading
         const loadingId = this.addLoadingIndicator();
 
         try {
-            // Send to n8n webhook
-            const response = await n8nManager.sendMessage(message);
+            // Convert files to base64 if needed
+            const fileData = await this.prepareFilesForUpload(filesToSend);
 
-            // Remove loading indicator
+            // Send to n8n
+            const response = await n8nManager.sendMessage(message, fileData);
+
+            // Remove loading
             this.removeMessage(loadingId);
 
-            // Add assistant response
-            if (response.reply || response.message) {
-                this.addMessage(response.reply || response.message, 'assistant');
-            } else {
-                this.addMessage('Message sent to workflow successfully!', 'system');
-            }
+            // Display response
+            const assistantMessage = {
+                role: 'assistant',
+                content: response.reply || response.message || 'Message received.'
+            };
+
+            this.displayMessage(assistantMessage);
+            chatManager.addMessage(assistantMessage);
+            this.renderChatList();
 
         } catch (error) {
-            // Remove loading indicator
             this.removeMessage(loadingId);
-
-            // Show error message
-            this.addMessage(
-                `Error: ${error.message}. Please check your n8n configuration.`,
-                'system'
-            );
+            const errorMessage = {
+                role: 'system',
+                content: `Error: ${error.message}`
+            };
+            this.displayMessage(errorMessage);
         } finally {
-            // Reset processing state
             this.isProcessing = false;
             this.sendButton.disabled = false;
             this.chatInput.focus();
         }
     }
 
-    addMessage(content, type = 'user') {
-        const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const messageEl = document.createElement('div');
-        messageEl.className = `message ${type}-message`;
-        messageEl.id = messageId;
+    async prepareFilesForUpload(files) {
+        const fileData = [];
 
-        const timestamp = new Date().toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
+        for (const file of files) {
+            if (file.type.startsWith('image/')) {
+                // Convert image to base64
+                const base64 = await this.fileToBase64(file);
+                fileData.push({
+                    name: file.name,
+                    type: file.type,
+                    data: base64
+                });
+            } else {
+                // For other files, read as text or base64
+                const content = await this.fileToBase64(file);
+                fileData.push({
+                    name: file.name,
+                    type: file.type,
+                    data: content
+                });
+            }
+        }
+
+        return fileData;
+    }
+
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
         });
+    }
 
-        let roleLabel = '';
-        if (type === 'user') roleLabel = 'You';
-        else if (type === 'assistant') roleLabel = 'NOX.AI';
-        else if (type === 'system') roleLabel = 'System';
+    displayMessage(message) {
+        const messageEl = document.createElement('div');
+        messageEl.className = `message ${message.role}-message`;
 
-        messageEl.innerHTML = `
-            ${roleLabel ? `<div class="message-header">
-                <span class="message-role">${roleLabel}</span>
-                <span class="message-time">${timestamp}</span>
-            </div>` : ''}
-            <div class="message-content">
-                <p>${this.escapeHtml(content)}</p>
-            </div>
-        `;
+        if (message.role === 'system') {
+            messageEl.innerHTML = `
+                <div class="message-content">
+                    ${this.escapeHtml(message.content)}
+                </div>
+            `;
+        } else {
+            const avatar = message.role === 'user' ? '👤' : '🤖';
+            const role = message.role === 'user' ? 'You' : 'NOX.AI';
+
+            let filesHtml = '';
+            if (message.files && message.files.length > 0) {
+                filesHtml = `<div style="margin-top: 8px; font-size: 13px; color: var(--text-tertiary);">
+                    ${message.files.map(f => `${this.getFileIcon(f.type)} ${f.name}`).join(', ')}
+                </div>`;
+            }
+
+            messageEl.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">
+                    <div class="message-role">${role}</div>
+                    <div class="message-text">${this.escapeHtml(message.content)}</div>
+                    ${filesHtml}
+                </div>
+            `;
+        }
 
         this.chatMessages.appendChild(messageEl);
         this.scrollToBottom();
+    }
 
-        return messageId;
+    addSystemMessage(content) {
+        this.displayMessage({ role: 'system', content });
     }
 
     addLoadingIndicator() {
-        const messageId = `loading_${Date.now()}`;
+        const loadingId = `loading_${Date.now()}`;
         const messageEl = document.createElement('div');
         messageEl.className = 'message assistant-message';
-        messageEl.id = messageId;
+        messageEl.id = loadingId;
 
         messageEl.innerHTML = `
-            <div class="message-header">
-                <span class="message-role">NOX.AI</span>
-            </div>
+            <div class="message-avatar">🤖</div>
             <div class="message-content">
+                <div class="message-role">NOX.AI</div>
                 <div class="loading-indicator">
                     <div class="loading-dot"></div>
                     <div class="loading-dot"></div>
@@ -187,7 +418,7 @@ class NOXApp {
         this.chatMessages.appendChild(messageEl);
         this.scrollToBottom();
 
-        return messageId;
+        return loadingId;
     }
 
     removeMessage(messageId) {
@@ -201,124 +432,46 @@ class NOXApp {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
 
+    // ==================== Execution Monitoring ====================
+
     updateExecutionDisplay(execution) {
-        if (!execution || !this.executionContent) {
-            return;
+        if (!execution || !this.executionContent) return;
+
+        const panel = document.getElementById('executionPanel');
+        if (panel.style.display === 'none') {
+            panel.style.display = 'flex';
         }
 
-        // Clear placeholder if present
         const placeholder = this.executionContent.querySelector('.execution-placeholder');
-        if (placeholder) {
-            placeholder.remove();
-        }
+        if (placeholder) placeholder.remove();
 
-        // Extract execution data
-        const { data, finished, stoppedAt, status } = execution;
+        const { data, finished } = execution;
+        if (!data || !data.resultData) return;
 
-        if (!data || !data.resultData) {
-            return;
-        }
-
-        // Clear existing content
         this.executionContent.innerHTML = '';
 
-        // Get workflow execution data
         const runData = data.resultData.runData || {};
 
-        // Create execution nodes display
         Object.keys(runData).forEach((nodeName) => {
             const nodeData = runData[nodeName];
             if (!nodeData || nodeData.length === 0) return;
 
             const lastRun = nodeData[nodeData.length - 1];
-
-            // Determine node status
-            let nodeStatus = 'completed';
-            if (!finished && !stoppedAt) {
-                nodeStatus = 'running';
-            } else if (lastRun.error) {
-                nodeStatus = 'error';
-            }
+            let nodeStatus = finished ? 'completed' : 'running';
+            if (lastRun.error) nodeStatus = 'error';
 
             this.addExecutionNode(nodeName, nodeStatus, lastRun);
         });
-
-        // Add execution summary at the top
-        this.addExecutionSummary(execution);
-    }
-
-    addExecutionSummary(execution) {
-        const summaryEl = document.createElement('div');
-        summaryEl.className = 'execution-item';
-        summaryEl.style.marginBottom = '20px';
-
-        const status = execution.finished ? 'completed' : 'running';
-        const statusText = execution.finished ? 'Completed' : 'Running';
-
-        const startTime = new Date(execution.startedAt).toLocaleTimeString();
-        const duration = execution.stoppedAt
-            ? `${Math.round((new Date(execution.stoppedAt) - new Date(execution.startedAt)) / 1000)}s`
-            : 'Running...';
-
-        const statsHtml = `
-            <div class="node-stats">
-                <div class="node-stat">
-                    <div class="node-stat-label">Status</div>
-                    <div class="node-stat-value">${statusText}</div>
-                </div>
-                <div class="node-stat">
-                    <div class="node-stat-label">Started</div>
-                    <div class="node-stat-value">${startTime}</div>
-                </div>
-                <div class="node-stat">
-                    <div class="node-stat-label">Duration</div>
-                    <div class="node-stat-value">${duration}</div>
-                </div>
-                ${execution.stoppedAt ? `
-                <div class="node-stat">
-                    <div class="node-stat-label">Finished</div>
-                    <div class="node-stat-value">${new Date(execution.stoppedAt).toLocaleTimeString()}</div>
-                </div>
-                ` : ''}
-            </div>
-        `;
-
-        summaryEl.innerHTML = `
-            <div class="node-header" data-node-id="summary">
-                <div class="node-status ${status}"></div>
-                <div class="node-name">Workflow Execution</div>
-                <svg class="node-expand-icon expanded" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-            </div>
-            <div class="node-details expanded" id="summary_details">
-                ${statsHtml}
-            </div>
-        `;
-
-        // Add click handler
-        const header = summaryEl.querySelector('.node-header');
-        header.addEventListener('click', () => this.toggleNodeDetails('summary'));
-
-        summaryEl.classList.add(status);
-        this.executionContent.insertBefore(summaryEl, this.executionContent.firstChild);
     }
 
     addExecutionNode(nodeName, status, nodeData) {
         const nodeId = `node_${nodeName.replace(/\s+/g, '_')}`;
         const nodeEl = document.createElement('div');
         nodeEl.className = `execution-item ${status}`;
-        nodeEl.dataset.nodeId = nodeId;
 
-        const executionTime = nodeData.executionTime
-            ? `${nodeData.executionTime}ms`
-            : 'N/A';
+        const executionTime = nodeData.executionTime ? `${nodeData.executionTime}ms` : 'N/A';
+        const startTime = nodeData.startTime ? new Date(nodeData.startTime).toLocaleTimeString() : 'N/A';
 
-        const startTime = nodeData.startTime
-            ? new Date(nodeData.startTime).toLocaleTimeString()
-            : 'N/A';
-
-        // Build stats
         const statsHtml = `
             <div class="node-stats">
                 <div class="node-stat">
@@ -329,30 +482,15 @@ class NOXApp {
                     <div class="node-stat-label">Started</div>
                     <div class="node-stat-value">${startTime}</div>
                 </div>
-                <div class="node-stat">
-                    <div class="node-stat-label">Status</div>
-                    <div class="node-stat-value">${status.toUpperCase()}</div>
-                </div>
             </div>
         `;
 
-        // Build logs if available
         let logsHtml = '';
         if (nodeData.error) {
             logsHtml = `
                 <div class="node-logs">
                     <div class="node-log-title">Error Details</div>
                     <div class="node-log-entry error">${this.escapeHtml(nodeData.error.message || 'Unknown error')}</div>
-                    ${nodeData.error.stack ? `<div class="node-log-entry error">${this.escapeHtml(nodeData.error.stack)}</div>` : ''}
-                </div>
-            `;
-        } else if (nodeData.data) {
-            // Show output data as logs
-            const outputData = JSON.stringify(nodeData.data, null, 2);
-            logsHtml = `
-                <div class="node-logs">
-                    <div class="node-log-title">Output Data</div>
-                    <div class="node-log-entry">${this.escapeHtml(outputData.substring(0, 500))}${outputData.length > 500 ? '...' : ''}</div>
                 </div>
             `;
         }
@@ -371,7 +509,6 @@ class NOXApp {
             </div>
         `;
 
-        // Add click handler for expand/collapse
         const header = nodeEl.querySelector('.node-header');
         header.addEventListener('click', () => this.toggleNodeDetails(nodeId));
 
@@ -383,41 +520,28 @@ class NOXApp {
         const icon = document.querySelector(`[data-node-id="${nodeId}"] .node-expand-icon`);
 
         if (details && icon) {
-            if (details.classList.contains('expanded')) {
-                details.classList.remove('expanded');
-                icon.classList.remove('expanded');
-            } else {
-                details.classList.add('expanded');
-                icon.classList.add('expanded');
-            }
+            details.classList.toggle('expanded');
+            icon.classList.toggle('expanded');
         }
     }
 
     toggleExecutionPanel() {
-        const content = this.executionContent;
-        const button = document.getElementById('toggleExecution');
-
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            button.style.transform = 'rotate(0deg)';
-        } else {
-            content.style.display = 'none';
-            button.style.transform = 'rotate(-90deg)';
-        }
+        const panel = document.getElementById('executionPanel');
+        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
     }
+
+    // ==================== Settings ====================
 
     openSettings() {
         const config = n8nManager.getConfig();
-
         document.getElementById('n8nUrl').value = config.n8nUrl || '';
         document.getElementById('webhookUrl').value = config.webhookUrl || '';
         document.getElementById('apiKey').value = config.apiKey || '';
-
-        this.settingsPanel.classList.remove('hidden');
+        this.settingsModal.classList.remove('hidden');
     }
 
     closeSettings() {
-        this.settingsPanel.classList.add('hidden');
+        this.settingsModal.classList.add('hidden');
     }
 
     saveSettings() {
@@ -429,10 +553,10 @@ class NOXApp {
 
         n8nManager.saveConfig(config);
         this.closeSettings();
-
-        // Show confirmation
-        this.addMessage('Settings saved successfully!', 'system');
+        this.addSystemMessage('Settings saved successfully!');
     }
+
+    // ==================== Utilities ====================
 
     escapeHtml(text) {
         const div = document.createElement('div');
