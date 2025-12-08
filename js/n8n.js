@@ -109,9 +109,11 @@ class N8NManager {
             }
 
             // If the response includes an execution ID, start monitoring
-            if (data.executionId) {
-                console.log('🔍 Starting execution monitoring for ID:', data.executionId);
-                this.startExecutionMonitoring(data.executionId);
+            // Check both top-level and nested in data object
+            const executionId = data.executionId || data.data?.executionId;
+            if (executionId) {
+                console.log('🔍 Starting execution monitoring for ID:', executionId);
+                this.startExecutionMonitoring(executionId);
             }
 
             return data;
