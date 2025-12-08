@@ -243,7 +243,6 @@ body {
 .content-wrapper {
     flex: 1;
     display: flex;
-    flex-direction: column;
     overflow: hidden;
     position: relative;
 }
@@ -258,6 +257,7 @@ body {
     max-width: 900px;
     margin: 0 auto;
     width: 100%;
+    min-width: 0;
 }
 
 .chat-messages {
@@ -483,48 +483,26 @@ body {
 }
 
 /* ====================================
-   Execution Panel
+   Execution Panel (Permanent Right Sidebar)
    ==================================== */
 .execution-panel {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 350px;
-    max-height: 400px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    margin: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    width: 320px;
+    background: var(--bg-sidebar);
+    border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
 }
 
 .execution-header {
-    padding: 12px 16px;
+    padding: 16px;
     border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    background: var(--bg-secondary);
 }
 
 .execution-header h3 {
     font-size: 14px;
     font-weight: 600;
-    color: var(--text-primary);
-}
-
-.toggle-button {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-}
-
-.toggle-button:hover {
     color: var(--text-primary);
 }
 
@@ -556,23 +534,32 @@ body {
 
 /* Execution Nodes */
 .execution-item {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     overflow: hidden;
+    transition: all 0.2s ease;
 }
 
 .execution-item.running {
     border-color: var(--node-running);
+    background: rgba(59, 130, 246, 0.05);
 }
 
 .execution-item.completed {
     border-color: var(--node-success);
+    background: rgba(16, 185, 129, 0.05);
 }
 
 .execution-item.error {
     border-color: var(--node-error);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.execution-item.warning {
+    border-color: var(--node-warning);
+    background: rgba(245, 158, 11, 0.05);
 }
 
 .node-header {
@@ -588,23 +575,38 @@ body {
 }
 
 .node-status {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
 }
 
 .node-status.running {
     background: var(--node-running);
+    color: var(--node-running);
     animation: pulse 1.5s ease-in-out infinite;
 }
 
 .node-status.completed {
     background: var(--node-success);
+    color: var(--node-success);
 }
 
 .node-status.error {
     background: var(--node-error);
+    color: var(--node-error);
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.node-status.pending {
+    background: var(--node-pending);
+    color: var(--node-pending);
+}
+
+.node-status.warning {
+    background: var(--node-warning);
+    color: var(--node-warning);
 }
 
 .node-name {
@@ -822,6 +824,16 @@ body {
 }
 
 /* Responsive */
+@media (max-width: 1200px) {
+    .execution-panel {
+        display: none;
+    }
+
+    .chat-section {
+        max-width: 100%;
+    }
+}
+
 @media (max-width: 768px) {
     .sidebar {
         position: fixed;
@@ -833,9 +845,5 @@ body {
 
     .sidebar.open {
         left: 0;
-    }
-
-    .execution-panel {
-        display: none;
     }
 }

@@ -92,19 +92,15 @@
                     </div>
                 </div>
 
-                <!-- Execution Monitor Panel (Collapsible) -->
-                <div class="execution-panel" id="executionPanel" style="display: none;">
+                <!-- Execution Monitor Panel (Permanent Right Panel) -->
+                <div class="execution-panel" id="executionPanel">
                     <div class="execution-header">
                         <h3>Workflow Execution</h3>
-                        <button id="toggleExecution" class="toggle-button">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M6 9l6 6 6-6"></path>
-                            </svg>
-                        </button>
                     </div>
                     <div id="executionContent" class="execution-content">
                         <div class="execution-placeholder">
                             <p>No active execution</p>
+                            <p style="font-size: 12px; margin-top: 8px; color: var(--text-tertiary);">Waiting for n8n workflow...</p>
                         </div>
                     </div>
                 </div>
