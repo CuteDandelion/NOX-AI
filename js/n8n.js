@@ -36,6 +36,14 @@ class N8NManager {
      * Save configuration to localStorage
      */
     saveConfig(config) {
+        // Trim trailing slashes from URLs
+        if (config.n8nUrl) {
+            config.n8nUrl = config.n8nUrl.replace(/\/+$/, '');
+        }
+        if (config.webhookUrl) {
+            config.webhookUrl = config.webhookUrl.replace(/\/+$/, '');
+        }
+
         this.config = { ...this.config, ...config };
         localStorage.setItem('nox-n8n-config', JSON.stringify(this.config));
     }
