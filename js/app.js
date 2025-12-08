@@ -295,10 +295,24 @@ class NOXApp {
             // Remove loading
             this.removeMessage(loadingId);
 
+            // Handle different response formats from n8n
+            let replyText = '';
+
+            if (Array.isArray(response)) {
+                // n8n returns array format: [{ "output": "..." }]
+                replyText = response[0]?.output || response[0]?.message || response[0]?.reply || JSON.stringify(response[0]);
+            } else if (typeof response === 'object') {
+                // n8n returns object format: { "reply": "..." } or { "output": "..." }
+                replyText = response.output || response.reply || response.message || JSON.stringify(response);
+            } else {
+                // Fallback: use response as-is
+                replyText = String(response);
+            }
+
             // Display response
             const assistantMessage = {
                 role: 'assistant',
-                content: response.reply || response.message || 'Message received.'
+                content: replyText
             };
 
             this.displayMessage(assistantMessage);
