@@ -85,11 +85,7 @@ class NOXApp {
             }
         });
 
-        // Execution panel toggle
-        const toggleExecution = document.getElementById('toggleExecution');
-        if (toggleExecution) {
-            toggleExecution.addEventListener('click', () => this.toggleExecutionPanel());
-        }
+        // Execution panel toggle (removed - now permanent panel)
     }
 
     setupTextareaAutoResize() {
@@ -437,11 +433,6 @@ class NOXApp {
     updateExecutionDisplay(execution) {
         if (!execution || !this.executionContent) return;
 
-        const panel = document.getElementById('executionPanel');
-        if (panel.style.display === 'none') {
-            panel.style.display = 'flex';
-        }
-
         const placeholder = this.executionContent.querySelector('.execution-placeholder');
         if (placeholder) placeholder.remove();
 
@@ -523,11 +514,6 @@ class NOXApp {
             details.classList.toggle('expanded');
             icon.classList.toggle('expanded');
         }
-    }
-
-    toggleExecutionPanel() {
-        const panel = document.getElementById('executionPanel');
-        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
     }
 
     // ==================== Settings ====================
