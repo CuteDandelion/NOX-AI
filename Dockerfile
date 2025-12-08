@@ -9,23 +9,20 @@ COPY js/ /usr/share/nginx/html/js/
 # Create nginx configuration for SPA with /nox/ base path
 RUN echo 'server { \
     listen 80; \
-    server_name _; \
-    root /usr/share/nginx/html; \
-    index index.html; \
+    server_name n8n.misakirose.com; \
     \
     location /nox/ { \
         alias /usr/share/nginx/html/; \
-        try_files $uri $uri/ /index.html; \
-        \
-        # Cache static assets \
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ { \
-            expires 1y; \
-            add_header Cache-Control "public, immutable"; \
-        } \
+        index index.html; \
+        try_files $uri $uri/ /nox/index.html; \
+    } \
+    \
+    location /nox { \
+        return 301 /nox/; \
     } \
     \
     location / { \
-        return 301 /nox/; \
+        return 404; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
