@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: nox-ai
-        image: your-dockerhub-username/nox-ai:latest
+        image: cutedandelion/nox-ai:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
