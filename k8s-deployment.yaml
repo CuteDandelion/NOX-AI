@@ -38,13 +38,13 @@ spec:
             cpu: "200m"
         livenessProbe:
           httpGet:
-            path: /
+            path: /nox/
             port: 80
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /
+            path: /nox/
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 5
