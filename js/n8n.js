@@ -66,10 +66,12 @@ class N8NManager {
                     ...(this.config.apiKey && { 'X-N8N-API-KEY': this.config.apiKey })
                 },
                 body: JSON.stringify({
-                    message: message,
+                    action: 'sendMessage',
+                    sessionId: this.getSessionId(),
+                    chatInput: message,
+                    message: message, // Keep for compatibility with regular webhooks
                     files: files,
-                    timestamp: new Date().toISOString(),
-                    sessionId: this.getSessionId()
+                    timestamp: new Date().toISOString()
                 })
             });
 
