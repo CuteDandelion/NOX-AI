@@ -58,6 +58,20 @@ class N8NManager {
             throw new Error('Webhook URL not configured. Please configure n8n settings.');
         }
 
+        const payload = {
+            action: 'sendMessage',
+            sessionId: this.getSessionId(),
+            chatInput: message,
+            message: message, // Keep for compatibility with regular webhooks
+            files: files,
+            timestamp: new Date().toISOString()
+        };
+
+        console.log('📤 Sending to n8n webhook:', {
+            url: this.config.webhookUrl,
+            payload: payload
+        });
+
         try {
             const response = await fetch(this.config.webhookUrl, {
                 method: 'POST',
@@ -65,30 +79,29 @@ class N8NManager {
                     'Content-Type': 'application/json',
                     ...(this.config.apiKey && { 'X-N8N-API-KEY': this.config.apiKey })
                 },
-                body: JSON.stringify({
-                    action: 'sendMessage',
-                    sessionId: this.getSessionId(),
-                    chatInput: message,
-                    message: message, // Keep for compatibility with regular webhooks
-                    files: files,
-                    timestamp: new Date().toISOString()
-                })
+                body: JSON.stringify(payload)
             });
 
+            console.log('📥 Webhook response status:', response.status, response.statusText);
+
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Webhook error response:', errorText);
                 throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
+            console.log('✅ Webhook response data:', data);
 
             // If the response includes an execution ID, start monitoring
             if (data.executionId) {
+                console.log('🔍 Starting execution monitoring for ID:', data.executionId);
                 this.startExecutionMonitoring(data.executionId);
             }
 
             return data;
         } catch (error) {
-            console.error('Error sending message to n8n:', error);
+            console.error('❌ Error sending message to n8n:', error);
             throw error;
         }
     }
@@ -155,17 +168,26 @@ class N8NManager {
                 headers['X-N8N-API-KEY'] = this.config.apiKey;
             }
 
+            console.log('🔄 Fetching execution details:', this.currentExecutionId);
+
             const response = await fetch(url, {
                 method: 'GET',
                 headers: headers
             });
 
             if (!response.ok) {
-                console.error(`Failed to fetch execution: ${response.status}`);
+                console.error('❌ Failed to fetch execution:', response.status);
                 return;
             }
 
             const execution = await response.json();
+            console.log('📊 Execution update:', {
+                id: execution.id,
+                status: execution.finished ? 'finished' : 'running',
+                mode: execution.mode,
+                startedAt: execution.startedAt,
+                stoppedAt: execution.stoppedAt
+            });
 
             // Call the update callback if registered
             if (this.executionUpdateCallback) {
@@ -174,6 +196,7 @@ class N8NManager {
 
             // Stop polling if execution is finished
             if (execution.finished || execution.stoppedAt) {
+                console.log('✅ Execution completed, stopping monitoring in 5s');
                 setTimeout(() => {
                     this.stopExecutionMonitoring();
                 }, 5000); // Keep showing for 5 more seconds
@@ -181,7 +204,7 @@ class N8NManager {
 
             return execution;
         } catch (error) {
-            console.error('Error fetching execution details:', error);
+            console.error('❌ Error fetching execution details:', error);
         }
     }
 
