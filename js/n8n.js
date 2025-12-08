@@ -90,8 +90,23 @@ class N8NManager {
                 throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
             }
 
-            const data = await response.json();
-            console.log('✅ Webhook response data:', data);
+            // Get the response text first
+            const responseText = await response.text();
+            console.log('📄 Raw response:', responseText);
+
+            // Try to parse as JSON, fallback to plain text
+            let data;
+            try {
+                data = JSON.parse(responseText);
+                console.log('✅ Parsed as JSON:', data);
+            } catch (e) {
+                // Not JSON, treat as plain text response
+                console.log('📝 Plain text response detected, wrapping in object');
+                data = {
+                    output: responseText,
+                    message: responseText
+                };
+            }
 
             // If the response includes an execution ID, start monitoring
             if (data.executionId) {
