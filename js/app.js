@@ -298,16 +298,30 @@ class NOXApp {
             // Handle different response formats from n8n
             let replyText = '';
 
+            console.log('🔍 Processing response:', response);
+
             if (Array.isArray(response)) {
                 // n8n returns array format: [{ "output": "..." }]
-                replyText = response[0]?.output || response[0]?.message || response[0]?.reply || JSON.stringify(response[0]);
+                const firstItem = response[0];
+                replyText = firstItem?.output || firstItem?.message || firstItem?.reply ||
+                           firstItem?.data?.output || firstItem?.data?.message ||
+                           JSON.stringify(firstItem);
             } else if (typeof response === 'object') {
-                // n8n returns object format: { "reply": "..." } or { "output": "..." }
-                replyText = response.output || response.reply || response.message || JSON.stringify(response);
+                // Check for nested data structure first: { success: true, data: { output: "..." } }
+                if (response.data && typeof response.data === 'object') {
+                    replyText = response.data.output || response.data.reply || response.data.message ||
+                               JSON.stringify(response.data);
+                } else {
+                    // Direct structure: { "output": "..." }
+                    replyText = response.output || response.reply || response.message ||
+                               JSON.stringify(response);
+                }
             } else {
                 // Fallback: use response as-is
                 replyText = String(response);
             }
+
+            console.log('✅ Extracted reply text:', replyText);
 
             // Display response
             const assistantMessage = {
