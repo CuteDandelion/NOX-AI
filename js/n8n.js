@@ -36,6 +36,14 @@ class N8NManager {
      * Save configuration to localStorage
      */
     saveConfig(config) {
+        // Trim trailing slashes from URLs
+        if (config.n8nUrl) {
+            config.n8nUrl = config.n8nUrl.replace(/\/+$/, '');
+        }
+        if (config.webhookUrl) {
+            config.webhookUrl = config.webhookUrl.replace(/\/+$/, '');
+        }
+
         this.config = { ...this.config, ...config };
         localStorage.setItem('nox-n8n-config', JSON.stringify(this.config));
     }
@@ -221,7 +229,17 @@ class N8NManager {
 
             return execution;
         } catch (error) {
-            console.error('❌ Error fetching execution details:', error);
+            // Check if it's a CORS error
+            if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+                console.warn('⚠️ CORS Error: Cannot fetch execution details from n8n API.');
+                console.warn('💡 To fix: Configure CORS in your n8n instance to allow origin:', window.location.origin);
+                console.warn('📚 See: https://docs.n8n.io/hosting/configuration/environment-variables/#cors');
+
+                // Stop trying to fetch if we hit CORS errors
+                this.stopExecutionMonitoring();
+            } else {
+                console.error('❌ Error fetching execution details:', error);
+            }
         }
     }
 
