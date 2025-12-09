@@ -8,10 +8,10 @@
     <!-- Prism.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
     <!-- Authentication -->
-    <script src="/nox/js/auth.js"></script>
+    <script src="/nox/js/auth.js?v=2"></script>
     <script>
         // Check authentication before loading the app
-        if (!AuthManager.isAuthenticated()) {
+        if (!window.AuthManager || !window.AuthManager.isAuthenticated()) {
             window.location.href = '/nox/login.html';
         }
     </script>
