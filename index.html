@@ -8,21 +8,30 @@
     <!-- Prism.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
     <!-- Authentication -->
-    <script src="/nox/js/auth.js?v=3"></script>
+    <script src="/nox/js/auth.js?v=4"></script>
     <script>
-        // Prevent infinite redirect loops
-        const redirectCount = sessionStorage.getItem('redirect_count') || 0;
+        // Prevent infinite redirect loops with debugging
+        const redirectCount = parseInt(sessionStorage.getItem('redirect_count') || '0');
+
+        console.log('🔍 Auth check - Redirect count:', redirectCount);
+        console.log('🔍 AuthManager exists:', !!window.AuthManager);
+        console.log('🔍 Is authenticated:', window.AuthManager ? window.AuthManager.isAuthenticated() : 'N/A');
 
         if (redirectCount > 3) {
             // Too many redirects, clear everything and show error
             sessionStorage.clear();
-            document.write('<div style="padding: 40px; text-align: center; font-family: sans-serif;"><h1>Authentication Error</h1><p>Too many redirects detected. Please <a href="/nox/login.html">click here to login</a>.</p></div>');
+            document.write('<div style="padding: 40px; text-align: center; font-family: sans-serif; background: #0a0e27; color: #e1e4e8; min-height: 100vh;"><h1 style="color: #667eea;">Authentication Error</h1><p>Too many redirects detected. Session has been cleared.</p><p style="margin-top: 20px;"><a href="/nox/login.html" style="color: #667eea; text-decoration: none; padding: 12px 24px; border: 2px solid #667eea; border-radius: 8px; display: inline-block;">Go to Login Page</a></p></div>');
+            throw new Error('Too many redirects - stopping execution');
         } else {
             // Check authentication
             if (!window.AuthManager || !window.AuthManager.isAuthenticated()) {
-                sessionStorage.setItem('redirect_count', parseInt(redirectCount) + 1);
-                window.location.replace('/nox/login.html');
+                console.log('⚠️ Not authenticated, redirecting to login...');
+                sessionStorage.setItem('redirect_count', (redirectCount + 1).toString());
+                setTimeout(() => {
+                    window.location.replace('/nox/login.html');
+                }, 100);
             } else {
+                console.log('✅ Authenticated, clearing redirect counter');
                 // Clear redirect counter on successful auth
                 sessionStorage.removeItem('redirect_count');
             }
