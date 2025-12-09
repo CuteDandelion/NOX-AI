@@ -7,11 +7,14 @@ class AuthManager {
     constructor() {
         // Pre-hashed credentials (never store plain text passwords!)
         // Default: username: admin, password: nox2024
-        // This hash was generated using PBKDF2 with 100,000 iterations
         this.credentials = {
             admin: {
-                salt: 'c7d3f4e2a1b5c9d8e6f7a3b2c1d4e5f6',
-                hash: '8a7f5c9d3e1b2a4f6c8d5e7b3a9c1f4d2e6b8a5c7f9d3e1b4a6c8f5d7e9b3a1c'
+                // Temporary: Using a fixed salt for the default password
+                salt: 'nox2024defaultsalt1234567890abcdef',
+                // This will be generated on first use
+                hash: null,
+                // TEMPORARY: Plain password for initial setup only
+                tempPassword: 'nox2024'
             }
         };
 
@@ -92,6 +95,13 @@ class AuthManager {
         }
 
         const userCred = this.credentials[username];
+
+        // TEMPORARY: Check plain password for initial setup
+        if (userCred.tempPassword && password === userCred.tempPassword) {
+            console.log('⚠️ Using temporary plain-text password. Please generate proper credentials!');
+            this.createSession(username);
+            return true;
+        }
 
         // Hash the provided password with the stored salt
         const hash = await this.hashPassword(password, userCred.salt);
