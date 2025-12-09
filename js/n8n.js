@@ -184,7 +184,8 @@ class N8NManager {
         }
 
         try {
-            const url = `${this.config.n8nUrl}/api/v1/executions/${this.currentExecutionId}`;
+            // Add includeData=true to get node-level execution details
+            const url = `${this.config.n8nUrl}/api/v1/executions/${this.currentExecutionId}?includeData=true`;
             const headers = {
                 'Content-Type': 'application/json'
             };
@@ -193,7 +194,7 @@ class N8NManager {
                 headers['X-N8N-API-KEY'] = this.config.apiKey;
             }
 
-            console.log('🔄 Fetching execution details:', this.currentExecutionId);
+            console.log('🔄 Fetching execution details with node data:', this.currentExecutionId);
 
             const response = await fetch(url, {
                 method: 'GET',
@@ -206,6 +207,8 @@ class N8NManager {
             }
 
             const execution = await response.json();
+
+            // Log execution summary
             console.log('📊 Execution update:', {
                 id: execution.id,
                 status: execution.finished ? 'finished' : 'running',
@@ -213,6 +216,26 @@ class N8NManager {
                 startedAt: execution.startedAt,
                 stoppedAt: execution.stoppedAt
             });
+
+            // Log node-level details if available
+            if (execution.data?.resultData?.runData) {
+                const nodes = Object.keys(execution.data.resultData.runData);
+                console.log('🔷 Nodes executed:', nodes.length, '→', nodes);
+
+                nodes.forEach(nodeName => {
+                    const nodeRuns = execution.data.resultData.runData[nodeName];
+                    if (nodeRuns && nodeRuns.length > 0) {
+                        const lastRun = nodeRuns[nodeRuns.length - 1];
+                        console.log(`  ├─ ${nodeName}:`, {
+                            status: lastRun.error ? '❌ error' : '✅ success',
+                            executionTime: lastRun.executionTime ? `${lastRun.executionTime}ms` : 'N/A',
+                            startTime: lastRun.startTime || 'N/A'
+                        });
+                    }
+                });
+            } else {
+                console.warn('⚠️ No node execution data found. Make sure includeData=true is working.');
+            }
 
             // Call the update callback if registered
             if (this.executionUpdateCallback) {
