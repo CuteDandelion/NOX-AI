@@ -615,17 +615,37 @@ class NOXApp {
     // ==================== Execution Monitoring ====================
 
     updateExecutionDisplay(execution) {
-        if (!execution || !this.executionContent) return;
+        console.log('🎨 updateExecutionDisplay called with:', execution);
+
+        if (!execution || !this.executionContent) {
+            console.warn('⚠️ Missing execution or executionContent element');
+            return;
+        }
 
         const placeholder = this.executionContent.querySelector('.execution-placeholder');
         if (placeholder) placeholder.remove();
 
         const { data, finished } = execution;
-        if (!data || !data.resultData) return;
+
+        console.log('📊 Execution data structure:', {
+            hasData: !!data,
+            hasResultData: !!data?.resultData,
+            hasRunData: !!data?.resultData?.runData,
+            runDataKeys: data?.resultData?.runData ? Object.keys(data.resultData.runData) : []
+        });
+
+        if (!data || !data.resultData) {
+            console.warn('⚠️ No execution data or resultData found');
+            this.executionContent.innerHTML = '<div class="execution-placeholder"><p>No node data available</p></div>';
+            return;
+        }
 
         this.executionContent.innerHTML = '';
 
         const runData = data.resultData.runData || {};
+        const nodeCount = Object.keys(runData).length;
+
+        console.log('🔷 Displaying', nodeCount, 'nodes');
 
         Object.keys(runData).forEach((nodeName) => {
             const nodeData = runData[nodeName];
@@ -635,8 +655,13 @@ class NOXApp {
             let nodeStatus = finished ? 'completed' : 'running';
             if (lastRun.error) nodeStatus = 'error';
 
+            console.log('  ➕ Adding node:', nodeName, 'status:', nodeStatus);
             this.addExecutionNode(nodeName, nodeStatus, lastRun);
         });
+
+        if (nodeCount === 0) {
+            this.executionContent.innerHTML = '<div class="execution-placeholder"><p>No nodes executed yet</p></div>';
+        }
     }
 
     addExecutionNode(nodeName, status, nodeData) {
