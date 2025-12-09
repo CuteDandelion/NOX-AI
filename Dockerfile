@@ -13,16 +13,11 @@ RUN echo 'server { \
     \
     location /nox/ { \
         alias /usr/share/nginx/html/; \
-        index index.html; \
-        try_files $uri $uri/ /nox/index.html; \
+        try_files $uri $uri/ /index.html =404; \
     } \
     \
-    location /nox { \
+    location = /nox { \
         return 301 /nox/; \
-    } \
-    \
-    location / { \
-        return 404; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
