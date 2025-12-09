@@ -10,11 +10,11 @@ class AuthManager {
         this.credentials = {
             admin: {
                 // Temporary: Using a fixed salt for the default password
-                salt: 'nox2024defaultsalt1234567890abcdef',
+                salt: 'b4a8e85e83a6fd10203af9b16f771513',
                 // This will be generated on first use
-                hash: null,
+                hash: '10f156323925fb1aebac03135c209143f345be979f7f589ca0400bce4b6e638e',
                 // TEMPORARY: Plain password for initial setup only
-                tempPassword: 'nox2024'
+                //tempPassword: 'nox2024'
             }
         };
 
@@ -97,11 +97,11 @@ class AuthManager {
         const userCred = this.credentials[username];
 
         // TEMPORARY: Check plain password for initial setup
-        if (userCred.tempPassword && password === userCred.tempPassword) {
-            console.log('⚠️ Using temporary plain-text password. Please generate proper credentials!');
-            this.createSession(username);
-            return true;
-        }
+        //if (userCred.tempPassword && password === userCred.tempPassword) {
+        //    console.log('⚠️ Using temporary plain-text password. Please generate proper credentials!');
+        //    this.createSession(username);
+        //    return true;
+        //}
 
         // Hash the provided password with the stored salt
         const hash = await this.hashPassword(password, userCred.salt);

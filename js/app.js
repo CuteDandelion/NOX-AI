@@ -89,7 +89,7 @@ class NOXApp {
         document.getElementById('cancelSettings').addEventListener('click', () => this.closeSettings());
 
         // Logout
-        document.getElementById('logoutButton').addEventListener('click', () => AuthManager.logout());
+        document.getElementById('logoutButton').addEventListener('click', () => window.AuthManager.logout());
 
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
