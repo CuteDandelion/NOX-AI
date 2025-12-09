@@ -20,6 +20,13 @@ class NOXApp {
         this.audioChunks = [];
         this.files = [];
 
+        // Workflow monitoring
+        this.workflowSelect = null;
+        this.executionsList = null;
+        this.selectedWorkflowId = null;
+        this.selectedExecutionId = null;
+        this.executionsRefreshInterval = null;
+
         this.init();
     }
 
@@ -42,10 +49,13 @@ class NOXApp {
         this.attachedFiles = document.getElementById('attachedFiles');
         this.executionContent = document.getElementById('executionContent');
         this.settingsModal = document.getElementById('settingsModal');
+        this.workflowSelect = document.getElementById('workflowSelect');
+        this.executionsList = document.getElementById('executionsList');
 
         // Setup event listeners
         this.setupEventListeners();
         this.setupN8NMonitoring();
+        this.setupWorkflowMonitoring();
         this.setupTextareaAutoResize();
         this.renderChatList();
         this.loadCurrentChat();
@@ -78,6 +88,10 @@ class NOXApp {
         document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
         document.getElementById('cancelSettings').addEventListener('click', () => this.closeSettings());
 
+        // Workflow monitoring
+        this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
+        document.getElementById('refreshWorkflows').addEventListener('click', () => this.loadWorkflows());
+
         // Close modal on outside click
         this.settingsModal.addEventListener('click', (e) => {
             if (e.target === this.settingsModal) {
@@ -99,6 +113,148 @@ class NOXApp {
         n8nManager.onExecutionUpdate((execution) => {
             this.updateExecutionDisplay(execution);
         });
+    }
+
+    // ==================== Workflow Monitoring ====================
+
+    async setupWorkflowMonitoring() {
+        await this.loadWorkflows();
+    }
+
+    async loadWorkflows() {
+        try {
+            const workflows = await n8nManager.getWorkflows();
+            this.workflowSelect.innerHTML = '<option value="">Select a workflow...</option>';
+
+            workflows.forEach(workflow => {
+                const option = document.createElement('option');
+                option.value = workflow.id;
+                option.textContent = workflow.name;
+                this.workflowSelect.appendChild(option);
+            });
+
+            console.log('✅ Loaded', workflows.length, 'workflows');
+        } catch (error) {
+            console.error('Failed to load workflows:', error);
+            this.workflowSelect.innerHTML = '<option value="">Error loading workflows</option>';
+        }
+    }
+
+    async handleWorkflowChange(e) {
+        this.selectedWorkflowId = e.target.value;
+
+        // Clear executions refresh interval
+        if (this.executionsRefreshInterval) {
+            clearInterval(this.executionsRefreshInterval);
+            this.executionsRefreshInterval = null;
+        }
+
+        if (!this.selectedWorkflowId) {
+            this.executionsList.innerHTML = '<div class="execution-placeholder"><p>Select a workflow to monitor</p></div>';
+            this.executionContent.innerHTML = '<div class="execution-placeholder"><p>No execution selected</p></div>';
+            return;
+        }
+
+        console.log('📊 Monitoring workflow:', this.selectedWorkflowId);
+
+        // Load executions immediately
+        await this.loadExecutions();
+
+        // Start auto-refresh every 2 seconds
+        this.executionsRefreshInterval = setInterval(() => {
+            this.loadExecutions();
+        }, 2000);
+    }
+
+    async loadExecutions() {
+        if (!this.selectedWorkflowId) return;
+
+        try {
+            const executions = await n8nManager.getExecutionsByWorkflow(this.selectedWorkflowId);
+
+            if (executions.length === 0) {
+                this.executionsList.innerHTML = '<div class="execution-placeholder"><p>No executions found</p></div>';
+                return;
+            }
+
+            // Update executions list
+            this.executionsList.innerHTML = '';
+            executions.forEach(execution => {
+                this.addExecutionListItem(execution);
+            });
+
+            // Auto-select first running or most recent execution
+            if (!this.selectedExecutionId || !executions.find(e => e.id === this.selectedExecutionId)) {
+                const runningExecution = executions.find(e => !e.finished);
+                const targetExecution = runningExecution || executions[0];
+                if (targetExecution) {
+                    this.selectExecution(targetExecution.id);
+                }
+            } else {
+                // Refresh currently selected execution
+                this.selectExecution(this.selectedExecutionId);
+            }
+        } catch (error) {
+            console.error('Failed to load executions:', error);
+            this.executionsList.innerHTML = '<div class="execution-placeholder"><p>Error loading executions</p></div>';
+        }
+    }
+
+    addExecutionListItem(execution) {
+        const item = document.createElement('div');
+        item.className = 'execution-list-item';
+        item.dataset.executionId = execution.id;
+
+        if (execution.id === this.selectedExecutionId) {
+            item.classList.add('selected');
+        }
+
+        const status = execution.finished ? (execution.data?.resultData?.error ? 'failed' : 'success') : 'running';
+        const statusClass = status === 'running' ? 'status-running' : status === 'failed' ? 'status-error' : 'status-success';
+
+        const timeAgo = this.getTimeAgo(new Date(execution.startedAt));
+
+        item.innerHTML = `
+            <div class="execution-status ${statusClass}"></div>
+            <div class="execution-info">
+                <div class="execution-status-text">${status === 'running' ? 'Running' : status === 'failed' ? 'Failed' : 'Success'}</div>
+                <div class="execution-time">${timeAgo}</div>
+            </div>
+        `;
+
+        item.addEventListener('click', () => this.selectExecution(execution.id));
+        this.executionsList.appendChild(item);
+    }
+
+    async selectExecution(executionId) {
+        this.selectedExecutionId = executionId;
+
+        // Update selection UI
+        document.querySelectorAll('.execution-list-item').forEach(item => {
+            if (item.dataset.executionId === executionId) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+
+        // Fetch and display execution details
+        n8nManager.currentExecutionId = executionId;
+        const execution = await n8nManager.fetchExecutionDetails();
+        if (execution) {
+            this.updateExecutionDisplay(execution);
+        }
+    }
+
+    getTimeAgo(date) {
+        const seconds = Math.floor((new Date() - date) / 1000);
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
     }
 
     // ==================== Chat Management ====================
