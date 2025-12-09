@@ -47,10 +47,10 @@ class NOXApp {
         this.voiceButton = document.getElementById('voiceButton');
         this.fileInput = document.getElementById('fileInput');
         this.attachedFiles = document.getElementById('attachedFiles');
-        this.executionContent = document.getElementById('executionContent');
         this.settingsModal = document.getElementById('settingsModal');
         this.workflowSelect = document.getElementById('workflowSelect');
         this.executionsList = document.getElementById('executionsList');
+        this.nodeLogsModal = document.getElementById('nodeLogsModal');
 
         // Setup event listeners
         this.setupEventListeners();
@@ -91,6 +91,19 @@ class NOXApp {
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
         document.getElementById('refreshWorkflows').addEventListener('click', () => this.loadWorkflows());
+
+        // Node logs modal
+        document.getElementById('closeNodeLogs').addEventListener('click', () => this.closeNodeLogsModal());
+        this.nodeLogsModal.addEventListener('click', (e) => {
+            if (e.target === this.nodeLogsModal) {
+                this.closeNodeLogsModal();
+            }
+        });
+
+        // Copy buttons
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.handleCopyClick(e));
+        });
 
         // Close modal on outside click
         this.settingsModal.addEventListener('click', (e) => {
@@ -177,72 +190,125 @@ class NOXApp {
                 return;
             }
 
-            // Update executions list
-            this.executionsList.innerHTML = '';
-            executions.forEach(execution => {
-                this.addExecutionListItem(execution);
-            });
+            // Fetch detailed data for each execution
+            const executionsWithData = await Promise.all(
+                executions.map(async (exec) => {
+                    const url = `${n8nManager.config.n8nUrl}/api/v1/executions/${exec.id}?includeData=true`;
+                    const headers = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (n8nManager.config.apiKey) {
+                        headers['X-N8N-API-KEY'] = n8nManager.config.apiKey;
+                    }
+                    try {
+                        const response = await fetch(url, { headers });
+                        if (response.ok) {
+                            return await response.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch execution details:', exec.id);
+                    }
+                    return exec;
+                })
+            );
 
-            // Auto-select first running or most recent execution
-            if (!this.selectedExecutionId || !executions.find(e => e.id === this.selectedExecutionId)) {
-                const runningExecution = executions.find(e => !e.finished);
-                const targetExecution = runningExecution || executions[0];
-                if (targetExecution) {
-                    this.selectExecution(targetExecution.id);
-                }
-            } else {
-                // Refresh currently selected execution
-                this.selectExecution(this.selectedExecutionId);
-            }
+            // Update DOM while preserving collapse state
+            this.updateExecutionsList(executionsWithData);
+
         } catch (error) {
             console.error('Failed to load executions:', error);
             this.executionsList.innerHTML = '<div class="execution-placeholder"><p>Error loading executions</p></div>';
         }
     }
 
-    addExecutionListItem(execution) {
-        const item = document.createElement('div');
-        item.className = 'execution-list-item';
-        item.dataset.executionId = execution.id;
+    updateExecutionsList(executions) {
+        const existingExecutions = {};
+        document.querySelectorAll('.execution-group').forEach(group => {
+            existingExecutions[group.dataset.executionId] = group.classList.contains('expanded');
+        });
 
-        if (execution.id === this.selectedExecutionId) {
-            item.classList.add('selected');
-        }
+        this.executionsList.innerHTML = '';
+
+        executions.forEach(execution => {
+            const wasExpanded = existingExecutions[execution.id] !== undefined ? existingExecutions[execution.id] : true;
+            this.addExecutionGroup(execution, wasExpanded);
+        });
+    }
+
+    addExecutionGroup(execution, expanded = true) {
+        const group = document.createElement('div');
+        group.className = `execution-group ${expanded ? 'expanded' : ''}`;
+        group.dataset.executionId = execution.id;
 
         const status = execution.finished ? (execution.data?.resultData?.error ? 'failed' : 'success') : 'running';
         const statusClass = status === 'running' ? 'status-running' : status === 'failed' ? 'status-error' : 'status-success';
-
         const timeAgo = this.getTimeAgo(new Date(execution.startedAt));
 
-        item.innerHTML = `
+        // Execution header
+        const header = document.createElement('div');
+        header.className = 'execution-group-header';
+        header.innerHTML = `
+            <svg class="expand-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
             <div class="execution-status ${statusClass}"></div>
-            <div class="execution-info">
-                <div class="execution-status-text">${status === 'running' ? 'Running' : status === 'failed' ? 'Failed' : 'Success'}</div>
-                <div class="execution-time">${timeAgo}</div>
+            <div class="execution-group-info">
+                <span class="execution-id">#${execution.id}</span>
+                <span class="execution-status-text">${status === 'running' ? 'Running' : status === 'failed' ? 'Failed' : 'Success'}</span>
+                <span class="execution-time">${timeAgo}</span>
             </div>
         `;
+        header.addEventListener('click', () => this.toggleExecutionGroup(execution.id));
 
-        item.addEventListener('click', () => this.selectExecution(execution.id));
-        this.executionsList.appendChild(item);
+        // Nodes list
+        const nodesList = document.createElement('div');
+        nodesList.className = 'execution-nodes';
+
+        if (execution.data?.resultData?.runData) {
+            const runData = execution.data.resultData.runData;
+            Object.keys(runData).forEach(nodeName => {
+                const nodeRuns = runData[nodeName];
+                if (nodeRuns && nodeRuns.length > 0) {
+                    const lastRun = nodeRuns[nodeRuns.length - 1];
+                    const nodeStatus = lastRun.error ? 'error' : execution.finished ? 'completed' : 'running';
+                    nodesList.appendChild(this.createNodeItem(execution.id, nodeName, nodeStatus, lastRun));
+                }
+            });
+        } else {
+            nodesList.innerHTML = '<div class="node-placeholder">No node data available</div>';
+        }
+
+        group.appendChild(header);
+        group.appendChild(nodesList);
+        this.executionsList.appendChild(group);
     }
 
-    async selectExecution(executionId) {
-        this.selectedExecutionId = executionId;
+    createNodeItem(executionId, nodeName, status, nodeData) {
+        const item = document.createElement('div');
+        item.className = `node-item ${status}`;
 
-        // Update selection UI
-        document.querySelectorAll('.execution-list-item').forEach(item => {
-            if (item.dataset.executionId === executionId) {
-                item.classList.add('selected');
-            } else {
-                item.classList.remove('selected');
-            }
+        const executionTime = nodeData.executionTime ? `${nodeData.executionTime}ms` : 'N/A';
+        const statusIcon = status === 'running' ? '⟳' : status === 'error' ? '✗' : '✓';
+
+        item.innerHTML = `
+            <span class="node-status-icon">${statusIcon}</span>
+            <span class="node-name">${this.escapeHtml(nodeName)}</span>
+            <span class="node-time">${executionTime}</span>
+            <button class="node-view-btn" data-execution-id="${executionId}" data-node-name="${nodeName}">View</button>
+        `;
+
+        item.querySelector('.node-view-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showNodeLogs(executionId, nodeName, nodeData);
         });
 
-        // Fetch and display execution details
-        n8nManager.currentExecutionId = executionId;
-        const execution = await n8nManager.fetchExecutionDetails();
-        if (execution) {
-            this.updateExecutionDisplay(execution);
+        return item;
+    }
+
+    toggleExecutionGroup(executionId) {
+        const group = document.querySelector(`.execution-group[data-execution-id="${executionId}"]`);
+        if (group) {
+            group.classList.toggle('expanded');
         }
     }
 
@@ -255,6 +321,53 @@ class NOXApp {
         if (hours < 24) return `${hours}h ago`;
         const days = Math.floor(hours / 24);
         return `${days}d ago`;
+    }
+
+    showNodeLogs(executionId, nodeName, nodeData) {
+        document.getElementById('nodeLogsTitle').textContent = `${nodeName} (#${executionId})`;
+
+        // Format input data
+        const inputData = nodeData.data?.main?.[0] || nodeData.source?.[0] || [];
+        document.getElementById('nodeInputData').textContent = JSON.stringify(inputData, null, 2);
+
+        // Format output data
+        const outputData = nodeData.data?.main?.[0] || [];
+        document.getElementById('nodeOutputData').textContent = JSON.stringify(outputData, null, 2);
+
+        // Format error data
+        const errorSection = document.getElementById('nodeErrorSection');
+        if (nodeData.error) {
+            errorSection.style.display = 'block';
+            document.getElementById('nodeErrorData').textContent = JSON.stringify(nodeData.error, null, 2);
+        } else {
+            errorSection.style.display = 'none';
+        }
+
+        // Execution metadata
+        document.getElementById('nodeExecutionTime').textContent = nodeData.executionTime ? `${nodeData.executionTime}ms` : 'N/A';
+        document.getElementById('nodeStartTime').textContent = nodeData.startTime ? new Date(nodeData.startTime).toLocaleString() : 'N/A';
+
+        this.nodeLogsModal.classList.remove('hidden');
+    }
+
+    closeNodeLogsModal() {
+        this.nodeLogsModal.classList.add('hidden');
+    }
+
+    handleCopyClick(e) {
+        const btn = e.currentTarget;
+        const targetId = btn.dataset.copyTarget;
+        const targetEl = document.getElementById(targetId);
+
+        if (targetEl) {
+            navigator.clipboard.writeText(targetEl.textContent).then(() => {
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
     }
 
     // ==================== Chat Management ====================
@@ -610,119 +723,6 @@ class NOXApp {
 
     scrollToBottom() {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-    }
-
-    // ==================== Execution Monitoring ====================
-
-    updateExecutionDisplay(execution) {
-        console.log('🎨 updateExecutionDisplay called with:', execution);
-
-        if (!execution || !this.executionContent) {
-            console.warn('⚠️ Missing execution or executionContent element');
-            return;
-        }
-
-        const placeholder = this.executionContent.querySelector('.execution-placeholder');
-        if (placeholder) placeholder.remove();
-
-        const { data, finished } = execution;
-
-        console.log('📊 Execution data structure:', {
-            hasData: !!data,
-            hasResultData: !!data?.resultData,
-            hasRunData: !!data?.resultData?.runData,
-            runDataKeys: data?.resultData?.runData ? Object.keys(data.resultData.runData) : []
-        });
-
-        if (!data || !data.resultData) {
-            console.warn('⚠️ No execution data or resultData found');
-            this.executionContent.innerHTML = '<div class="execution-placeholder"><p>No node data available</p></div>';
-            return;
-        }
-
-        this.executionContent.innerHTML = '';
-
-        const runData = data.resultData.runData || {};
-        const nodeCount = Object.keys(runData).length;
-
-        console.log('🔷 Displaying', nodeCount, 'nodes');
-
-        Object.keys(runData).forEach((nodeName) => {
-            const nodeData = runData[nodeName];
-            if (!nodeData || nodeData.length === 0) return;
-
-            const lastRun = nodeData[nodeData.length - 1];
-            let nodeStatus = finished ? 'completed' : 'running';
-            if (lastRun.error) nodeStatus = 'error';
-
-            console.log('  ➕ Adding node:', nodeName, 'status:', nodeStatus);
-            this.addExecutionNode(nodeName, nodeStatus, lastRun);
-        });
-
-        if (nodeCount === 0) {
-            this.executionContent.innerHTML = '<div class="execution-placeholder"><p>No nodes executed yet</p></div>';
-        }
-    }
-
-    addExecutionNode(nodeName, status, nodeData) {
-        const nodeId = `node_${nodeName.replace(/\s+/g, '_')}`;
-        const nodeEl = document.createElement('div');
-        nodeEl.className = `execution-item ${status}`;
-
-        const executionTime = nodeData.executionTime ? `${nodeData.executionTime}ms` : 'N/A';
-        const startTime = nodeData.startTime ? new Date(nodeData.startTime).toLocaleTimeString() : 'N/A';
-
-        const statsHtml = `
-            <div class="node-stats">
-                <div class="node-stat">
-                    <div class="node-stat-label">Duration</div>
-                    <div class="node-stat-value">${executionTime}</div>
-                </div>
-                <div class="node-stat">
-                    <div class="node-stat-label">Started</div>
-                    <div class="node-stat-value">${startTime}</div>
-                </div>
-            </div>
-        `;
-
-        let logsHtml = '';
-        if (nodeData.error) {
-            logsHtml = `
-                <div class="node-logs">
-                    <div class="node-log-title">Error Details</div>
-                    <div class="node-log-entry error">${this.escapeHtml(nodeData.error.message || 'Unknown error')}</div>
-                </div>
-            `;
-        }
-
-        nodeEl.innerHTML = `
-            <div class="node-header" data-node-id="${nodeId}">
-                <div class="node-status ${status}"></div>
-                <div class="node-name">${this.escapeHtml(nodeName)}</div>
-                <svg class="node-expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-            </div>
-            <div class="node-details" id="${nodeId}_details">
-                ${statsHtml}
-                ${logsHtml}
-            </div>
-        `;
-
-        const header = nodeEl.querySelector('.node-header');
-        header.addEventListener('click', () => this.toggleNodeDetails(nodeId));
-
-        this.executionContent.appendChild(nodeEl);
-    }
-
-    toggleNodeDetails(nodeId) {
-        const details = document.getElementById(`${nodeId}_details`);
-        const icon = document.querySelector(`[data-node-id="${nodeId}"] .node-expand-icon`);
-
-        if (details && icon) {
-            details.classList.toggle('expanded');
-            icon.classList.toggle('expanded');
-        }
     }
 
     // ==================== Settings ====================
