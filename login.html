@@ -258,8 +258,11 @@
         </div>
     </div>
 
-    <script src="/nox/js/auth.js?v=2"></script>
+    <script src="/nox/js/auth.js?v=3"></script>
     <script>
+        // Clear redirect counter when on login page
+        sessionStorage.removeItem('redirect_count');
+
         // Generate random stars
         const starsContainer = document.getElementById('stars');
         for (let i = 0; i < 100; i++) {
@@ -287,9 +290,11 @@
             errorMessage.classList.remove('show');
 
             try {
-                const success = await AuthManager.login(username, password);
+                const success = await window.AuthManager.login(username, password);
 
                 if (success) {
+                    // Clear redirect counter on successful login
+                    sessionStorage.removeItem('redirect_count');
                     window.location.href = '/nox/index.html';
                 } else {
                     showError('Invalid username or password');

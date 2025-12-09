@@ -8,11 +8,24 @@
     <!-- Prism.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
     <!-- Authentication -->
-    <script src="/nox/js/auth.js?v=2"></script>
+    <script src="/nox/js/auth.js?v=3"></script>
     <script>
-        // Check authentication before loading the app
-        if (!window.AuthManager || !window.AuthManager.isAuthenticated()) {
-            window.location.href = '/nox/login.html';
+        // Prevent infinite redirect loops
+        const redirectCount = sessionStorage.getItem('redirect_count') || 0;
+
+        if (redirectCount > 3) {
+            // Too many redirects, clear everything and show error
+            sessionStorage.clear();
+            document.write('<div style="padding: 40px; text-align: center; font-family: sans-serif;"><h1>Authentication Error</h1><p>Too many redirects detected. Please <a href="/nox/login.html">click here to login</a>.</p></div>');
+        } else {
+            // Check authentication
+            if (!window.AuthManager || !window.AuthManager.isAuthenticated()) {
+                sessionStorage.setItem('redirect_count', parseInt(redirectCount) + 1);
+                window.location.replace('/nox/login.html');
+            } else {
+                // Clear redirect counter on successful auth
+                sessionStorage.removeItem('redirect_count');
+            }
         }
     </script>
 </head>
