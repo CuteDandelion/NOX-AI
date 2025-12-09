@@ -676,13 +676,18 @@ class NOXApp {
                 <div class="message-avatar">${avatar}</div>
                 <div class="message-content">
                     <div class="message-role">${role}</div>
-                    <div class="message-text">${this.escapeHtml(message.content)}</div>
+                    <div class="message-text">${this.formatMessageContent(message.content)}</div>
                     ${filesHtml}
                 </div>
             `;
         }
 
         this.chatMessages.appendChild(messageEl);
+
+        // Apply syntax highlighting and setup copy buttons
+        this.highlightCode();
+        this.setupCodeCopyButtons();
+
         this.scrollToBottom();
     }
 
@@ -757,6 +762,83 @@ class NOXApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    formatMessageContent(content) {
+        // Parse markdown code blocks and inline code
+        let formatted = content;
+
+        // Replace code blocks (```language\ncode\n```)
+        formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+            const language = lang || 'plaintext';
+            const escapedCode = this.escapeHtml(code.trim());
+            const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            return `<div class="code-block-wrapper">
+                <div class="code-block-header">
+                    <span class="code-block-lang">${language}</span>
+                    <button class="code-copy-btn" data-code-id="${codeId}" title="Copy code">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+                <pre class="code-block" id="${codeId}"><code class="language-${language}">${escapedCode}</code></pre>
+            </div>`;
+        });
+
+        // Replace inline code (`code`)
+        formatted = formatted.replace(/`([^`]+)`/g, (match, code) => {
+            return `<code class="inline-code">${this.escapeHtml(code)}</code>`;
+        });
+
+        // Escape remaining HTML and convert newlines to <br>
+        // Split by code blocks and inline code to avoid double-escaping
+        const parts = formatted.split(/(<div class="code-block-wrapper">[\s\S]*?<\/div>|<code class="inline-code">[\s\S]*?<\/code>)/);
+        formatted = parts.map((part, i) => {
+            // Skip code blocks and inline code (odd indices)
+            if (i % 2 === 0) {
+                return this.escapeHtml(part).replace(/\n/g, '<br>');
+            }
+            return part;
+        }).join('');
+
+        return formatted;
+    }
+
+    highlightCode() {
+        // Apply Prism.js syntax highlighting to all code blocks
+        if (window.Prism) {
+            Prism.highlightAll();
+        }
+    }
+
+    setupCodeCopyButtons() {
+        // Add click handlers to copy buttons
+        document.querySelectorAll('.code-copy-btn').forEach(btn => {
+            // Remove old listeners
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+
+            newBtn.addEventListener('click', (e) => {
+                const codeId = e.currentTarget.dataset.codeId;
+                const codeBlock = document.getElementById(codeId);
+                if (codeBlock) {
+                    const code = codeBlock.textContent;
+                    navigator.clipboard.writeText(code).then(() => {
+                        const originalHTML = e.currentTarget.innerHTML;
+                        e.currentTarget.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+                        e.currentTarget.classList.add('copied');
+                        setTimeout(() => {
+                            e.currentTarget.innerHTML = originalHTML;
+                            e.currentTarget.classList.remove('copied');
+                        }, 2000);
+                    });
+                }
+            });
+        });
     }
 }
 

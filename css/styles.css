@@ -1263,3 +1263,102 @@ body {
     color: var(--text-primary);
     font-weight: 500;
 }
+
+/* Code Blocks */
+.code-block-wrapper {
+    margin: 12px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.code-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.code-block-lang {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.code-copy-btn {
+    padding: 4px 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.code-copy-btn:hover {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.code-copy-btn.copied {
+    background: var(--node-success);
+    border-color: var(--node-success);
+    color: white;
+}
+
+.code-block {
+    margin: 0;
+    padding: 12px;
+    background: var(--bg-primary);
+    overflow-x: auto;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.code-block code {
+    font-family: inherit;
+    background: none;
+    padding: 0;
+}
+
+/* Inline Code */
+.inline-code {
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 13px;
+    color: var(--accent-color);
+}
+
+/* Override Prism theme for dark mode */
+.dark-theme pre[class*="language-"] {
+    background: var(--bg-primary);
+}
+
+.dark-theme code[class*="language-"] {
+    color: var(--text-primary);
+}
+
+/* Message text formatting */
+.message-text {
+    line-height: 1.6;
+}
+
+.message-text br {
+    display: block;
+    content: "";
+    margin-top: 0.5em;
+}
