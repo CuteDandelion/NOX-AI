@@ -765,42 +765,31 @@ class NOXApp {
     }
 
     formatMessageContent(content) {
-        // Parse markdown code blocks and inline code
-        let formatted = content;
+        // Step 1: Escape the entire content first to prevent XSS
+        let formatted = this.escapeHtml(content);
 
-        // Replace code blocks (```language\ncode\n```)
+        // Step 2: Replace code blocks in the already-escaped content
+        // The content is now safe, and we can inject HTML wrapper elements
         formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
             const language = lang || 'plaintext';
-            const escapedCode = this.escapeHtml(code.trim());
             const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            // Code is already escaped from step 1, so we don't escape again
 
-            return `<div class="code-block-wrapper">
-                <div class="code-block-header">
-                    <span class="code-block-lang">${language}</span>
-                    <button class="code-copy-btn" data-code-id="${codeId}" title="Copy code">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                        Copy
-                    </button>
-                </div>
-                <pre class="code-block" id="${codeId}"><code class="language-${language}">${escapedCode}</code></pre>
-            </div>`;
+            return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-block-lang">${language}</span><button class="code-copy-btn" data-code-id="${codeId}" title="Copy code"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>Copy</button></div><pre class="code-block" id="${codeId}"><code class="language-${language}">${code.trim()}</code></pre></div>`;
         });
 
-        // Replace inline code (`code`)
+        // Step 3: Replace inline code in the already-escaped content
         formatted = formatted.replace(/`([^`]+)`/g, (match, code) => {
-            return `<code class="inline-code">${this.escapeHtml(code)}</code>`;
+            // Code is already escaped from step 1
+            return `<code class="inline-code">${code}</code>`;
         });
 
-        // Escape remaining HTML and convert newlines to <br>
-        // Split by code blocks and inline code to avoid double-escaping
-        const parts = formatted.split(/(<div class="code-block-wrapper">[\s\S]*?<\/div>|<code class="inline-code">[\s\S]*?<\/code>)/);
+        // Step 4: Convert newlines to <br>, but not inside code blocks
+        const parts = formatted.split(/(<div class="code-block-wrapper">.*?<\/div>|<code class="inline-code">.*?<\/code>)/);
         formatted = parts.map((part, i) => {
-            // Skip code blocks and inline code (odd indices)
+            // Even indices are plain text, odd indices are code blocks
             if (i % 2 === 0) {
-                return this.escapeHtml(part).replace(/\n/g, '<br>');
+                return part.replace(/\n/g, '<br>');
             }
             return part;
         }).join('');
