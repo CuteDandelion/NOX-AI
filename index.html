@@ -93,14 +93,46 @@
                 </div>
 
                 <!-- Execution Monitor Panel (Permanent Right Panel) -->
-                <div class="execution-panel" id="executionPanel">
+<div class="execution-panel" id="executionPanel">
                     <div class="execution-header">
-                        <h3>Workflow Execution</h3>
+                        <h3>Workflow Monitor</h3>
                     </div>
-                    <div id="executionContent" class="execution-content">
-                        <div class="execution-placeholder">
-                            <p>No active execution</p>
-                            <p style="font-size: 12px; margin-top: 8px; color: var(--text-tertiary);">Waiting for n8n workflow...</p>
+
+                    <!-- Workflow Selection -->
+                    <div class="workflow-selector">
+                        <label for="workflowSelect">Select Workflow:</label>
+                        <select id="workflowSelect" class="workflow-dropdown">
+                            <option value="">Loading workflows...</option>
+                        </select>
+                        <button id="refreshWorkflows" class="refresh-btn" title="Refresh workflows">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Executions List -->
+                    <div class="executions-section">
+                        <div class="executions-header">
+                            <h4>Recent Executions</h4>
+                            <span class="auto-refresh-indicator">●</span>
+                        </div>
+                        <div id="executionsList" class="executions-list">
+                            <div class="execution-placeholder">
+                                <p>Select a workflow to monitor</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Selected Execution Details -->
+                    <div class="execution-details-section">
+                        <div class="execution-details-header">
+                            <h4>Execution Nodes</h4>
+                        </div>
+                        <div id="executionContent" class="execution-content">
+                            <div class="execution-placeholder">
+                                <p>No execution selected</p>
+                            </div>
                         </div>
                     </div>
                 </div>

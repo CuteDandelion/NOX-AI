@@ -275,6 +275,83 @@ class N8NManager {
     }
 
     /**
+     * Get all workflows
+     * @returns {Promise<Array>} - List of workflows
+     */
+    async getWorkflows() {
+        if (!this.config.n8nUrl) {
+            throw new Error('n8n URL not configured');
+        }
+
+        try {
+            const url = `${this.config.n8nUrl}/api/v1/workflows`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+
+            if (this.config.apiKey) {
+                headers['X-N8N-API-KEY'] = this.config.apiKey;
+            }
+
+            console.log('📋 Fetching workflows list');
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: headers
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch workflows: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('✅ Fetched workflows:', data.data?.length || 0);
+            return data.data || [];
+        } catch (error) {
+            console.error('❌ Error fetching workflows:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get executions for a specific workflow
+     * @param {string} workflowId - The workflow ID
+     * @param {number} limit - Number of executions to fetch
+     * @returns {Promise<Array>} - List of executions
+     */
+    async getExecutionsByWorkflow(workflowId, limit = 20) {
+        if (!this.config.n8nUrl) {
+            throw new Error('n8n URL not configured');
+        }
+
+        try {
+            const url = `${this.config.n8nUrl}/api/v1/executions?workflowId=${workflowId}&limit=${limit}`;
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+
+            if (this.config.apiKey) {
+                headers['X-N8N-API-KEY'] = this.config.apiKey;
+            }
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: headers
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch executions: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.data || [];
+        } catch (error) {
+            console.error('❌ Error fetching executions for workflow:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Get all executions (for history)
      * @param {number} limit - Number of executions to fetch
      */
