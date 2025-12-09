@@ -136,13 +136,15 @@ class AuthManager {
 
             // Check if session has expired
             if (Date.now() > session.expiresAt) {
-                this.logout();
+                // Clear expired session but don't redirect (caller will handle redirect)
+                sessionStorage.removeItem(this.SESSION_KEY);
                 return false;
             }
 
             return true;
         } catch (error) {
-            this.logout();
+            // Clear invalid session but don't redirect (caller will handle redirect)
+            sessionStorage.removeItem(this.SESSION_KEY);
             return false;
         }
     }
