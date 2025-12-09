@@ -785,7 +785,8 @@ class NOXApp {
         });
 
         // Step 4: Convert newlines to <br>, but not inside code blocks
-        const parts = formatted.split(/(<div class="code-block-wrapper">.*?<\/div>|<code class="inline-code">.*?<\/code>)/);
+        // Use [\s\S] to match any character including newlines
+        const parts = formatted.split(/(<div class="code-block-wrapper">[\s\S]*?<\/div>|<code class="inline-code">[\s\S]*?<\/code>)/);
         formatted = parts.map((part, i) => {
             // Even indices are plain text, odd indices are code blocks
             if (i % 2 === 0) {
