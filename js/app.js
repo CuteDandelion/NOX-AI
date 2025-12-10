@@ -38,7 +38,12 @@ class NOXApp {
         }
     }
 
-    setup() {
+    async setup() {
+        // Migrate all sensitive data to encrypted storage
+        if (window.CryptoUtils) {
+            await window.CryptoUtils.migrateAllData();
+        }
+
         // Get DOM elements
         this.chatMessages = document.getElementById('chatMessages');
         this.chatInput = document.getElementById('chatInput');
