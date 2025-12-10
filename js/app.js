@@ -747,16 +747,16 @@ class NOXApp {
         this.settingsModal.classList.add('hidden');
     }
 
-    saveSettings() {
+    async saveSettings() {
         const config = {
             n8nUrl: document.getElementById('n8nUrl').value.trim(),
             webhookUrl: document.getElementById('webhookUrl').value.trim(),
             apiKey: document.getElementById('apiKey').value.trim()
         };
 
-        n8nManager.saveConfig(config);
+        await n8nManager.saveConfig(config);
         this.closeSettings();
-        this.addSystemMessage('Settings saved successfully!');
+        this.addSystemMessage('Settings saved successfully! Configuration is now encrypted.');
     }
 
     // ==================== Utilities ====================

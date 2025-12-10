@@ -321,7 +321,7 @@ body {
 }
 
 .message.assistant-message .message-avatar {
-    background: var(--accent-primary);
+    background: transparent;
 }
 
 .message.system-message {

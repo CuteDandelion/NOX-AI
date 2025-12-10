@@ -15,7 +15,31 @@ class N8NManager {
         this.executionPollingInterval = null;
         this.executionUpdateCallback = null;
 
-        this.loadConfig();
+        // Load config asynchronously
+        this.init();
+    }
+
+    /**
+     * Initialize and migrate config to encrypted storage
+     */
+    async init() {
+        await this.loadConfig();
+
+        // Migrate existing plain text config to encrypted storage
+        const plainTextConfig = localStorage.getItem('nox-n8n-config');
+        if (plainTextConfig && window.CryptoUtils) {
+            try {
+                // Check if it's actually plain text (not encrypted)
+                const parsed = JSON.parse(plainTextConfig);
+                if (parsed && (parsed.n8nUrl || parsed.webhookUrl || parsed.apiKey)) {
+                    console.log('🔄 Migrating n8n config to encrypted storage...');
+                    await this.saveConfig(parsed);
+                    console.log('✅ Config successfully encrypted');
+                }
+            } catch (e) {
+                // If it fails to parse, it might already be encrypted, ignore
+            }
+        }
     }
 
     /**
