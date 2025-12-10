@@ -124,6 +124,55 @@ class CryptoUtils {
     clearKey() {
         sessionStorage.removeItem('nox_enc_key');
     }
+
+    /**
+     * Remove item from encrypted storage
+     */
+    async removeItem(key) {
+        localStorage.removeItem(key);
+    }
+
+    /**
+     * Migrate all sensitive data to encrypted storage
+     * This runs once to encrypt existing plain text data
+     */
+    async migrateAllData() {
+        const sensitiveKeys = ['nox-chats', 'nox-n8n-config'];
+        let migratedCount = 0;
+
+        for (const key of sensitiveKeys) {
+            const plainText = localStorage.getItem(key);
+            if (plainText) {
+                try {
+                    // Try to parse as JSON to see if it's plain text
+                    const parsed = JSON.parse(plainText);
+
+                    // Check if it's actually plain text (not already encrypted)
+                    if (parsed && typeof parsed === 'object') {
+                        console.log(`🔄 Migrating ${key} to encrypted storage...`);
+                        await this.setItem(key, parsed);
+                        migratedCount++;
+                        console.log(`✅ ${key} successfully encrypted`);
+                    }
+                } catch (e) {
+                    // If it fails to parse as JSON, it might already be encrypted
+                    // Try to decrypt it to verify
+                    try {
+                        await this.getItem(key);
+                        // If decrypt works, it's already encrypted, skip
+                    } catch (decryptError) {
+                        console.warn(`⚠️ Could not migrate ${key}:`, e);
+                    }
+                }
+            }
+        }
+
+        if (migratedCount > 0) {
+            console.log(`✅ Migration complete: ${migratedCount} item(s) encrypted`);
+        }
+
+        return migratedCount;
+    }
 }
 
 // Create global instance

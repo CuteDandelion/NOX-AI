@@ -6,8 +6,14 @@ class ChatManager {
     constructor() {
         this.chats = [];
         this.currentChatId = null;
-        this.loadChats();
+        this.ready = false;
+        this.initialize();
+    }
+
+    async initialize() {
+        await this.loadChats();
         this.init();
+        this.ready = true;
     }
 
     init() {
@@ -19,20 +25,39 @@ class ChatManager {
         }
     }
 
-    loadChats() {
-        const stored = localStorage.getItem('nox-chats');
-        if (stored) {
-            try {
-                this.chats = JSON.parse(stored);
-            } catch (e) {
-                console.error('Failed to load chats:', e);
-                this.chats = [];
+    /**
+     * Load chats from encrypted storage
+     */
+    async loadChats() {
+        if (window.CryptoUtils) {
+            const stored = await window.CryptoUtils.getItem('nox-chats');
+            if (stored) {
+                this.chats = stored;
+            }
+        } else {
+            // Fallback to unencrypted (for initial load before crypto-utils loads)
+            const stored = localStorage.getItem('nox-chats');
+            if (stored) {
+                try {
+                    this.chats = JSON.parse(stored);
+                } catch (e) {
+                    console.error('Failed to load chats:', e);
+                    this.chats = [];
+                }
             }
         }
     }
 
-    saveChats() {
-        localStorage.setItem('nox-chats', JSON.stringify(this.chats));
+    /**
+     * Save chats to encrypted storage
+     */
+    async saveChats() {
+        if (window.CryptoUtils) {
+            await window.CryptoUtils.setItem('nox-chats', this.chats);
+        } else {
+            // Fallback to unencrypted
+            localStorage.setItem('nox-chats', JSON.stringify(this.chats));
+        }
     }
 
     createNewChat() {
