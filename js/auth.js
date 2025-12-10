@@ -181,6 +181,10 @@ class AuthManager {
      */
     logout() {
         sessionStorage.removeItem(this.SESSION_KEY);
+        // Clear encryption key on logout
+        if (window.CryptoUtils) {
+            window.CryptoUtils.clearKey();
+        }
         window.location.href = '/nox/login.html';
     }
 
