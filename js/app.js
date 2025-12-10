@@ -89,7 +89,7 @@ class NOXApp {
         document.getElementById('cancelSettings').addEventListener('click', () => this.closeSettings());
 
         // Logout
-        document.getElementById('logoutButton').addEventListener('click', () => AuthManager.logout());
+        document.getElementById('logoutButton').addEventListener('click', () => window.AuthManager.logout());
 
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
@@ -766,35 +766,27 @@ class NOXApp {
             return '👤';
         }
 
-        // NOX.AI logo SVG that works in both dark and light mode
-        return `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        // NOX.AI logo SVG with silverish glow - matches login page
+        return `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 0 4px rgba(200, 220, 255, 0.3));">
             <defs>
-                <linearGradient id="nox-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-                    <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                <linearGradient id="nox-silver-${Date.now()}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#e0e7ff;stop-opacity:1" />
+                    <stop offset="30%" style="stop-color:#c7d2fe;stop-opacity:1" />
+                    <stop offset="60%" style="stop-color:#a5b4fc;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#818cf8;stop-opacity:1" />
                 </linearGradient>
+                <filter id="nox-glow-${Date.now()}">
+                    <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
             </defs>
-            <!-- Hexagon background -->
-            <path d="M50 10 L85 30 L85 70 L50 90 L15 70 L15 30 Z"
-                  stroke="url(#nox-gradient)"
-                  stroke-width="4"
-                  fill="rgba(102, 126, 234, 0.15)"/>
-            <!-- N -->
-            <path d="M30 38 L30 62 M30 38 L40 62 M40 38 L40 62"
-                  stroke="url(#nox-gradient)"
-                  stroke-width="4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"/>
-            <!-- O -->
-            <circle cx="56" cy="50" r="10"
-                    stroke="url(#nox-gradient)"
-                    stroke-width="4"
-                    fill="none"/>
-            <!-- X -->
-            <path d="M68 38 L78 62 M78 38 L68 62"
-                  stroke="url(#nox-gradient)"
-                  stroke-width="4"
-                  stroke-linecap="round"/>
+            <path d="M50 10 L85 30 L85 70 L50 90 L15 70 L15 30 Z" stroke="url(#nox-silver-${Date.now()})" stroke-width="2" fill="rgba(165, 180, 252, 0.08)"/>
+            <path d="M28 36 L28 64 M28 36 L42 64 M42 36 L42 64" stroke="url(#nox-silver-${Date.now()})" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" filter="url(#nox-glow-${Date.now()})"/>
+            <circle cx="58" cy="50" r="12" stroke="url(#nox-silver-${Date.now()})" stroke-width="5" fill="none" filter="url(#nox-glow-${Date.now()})"/>
+            <path d="M70 36 L82 64 M82 36 L70 64" stroke="url(#nox-silver-${Date.now()})" stroke-width="5" stroke-linecap="round" filter="url(#nox-glow-${Date.now()})"/>
         </svg>`;
     }
 

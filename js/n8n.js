@@ -19,23 +19,31 @@ class N8NManager {
     }
 
     /**
-     * Load configuration from localStorage
+     * Load configuration from encrypted localStorage
      */
-    loadConfig() {
-        const stored = localStorage.getItem('nox-n8n-config');
-        if (stored) {
-            try {
-                this.config = JSON.parse(stored);
-            } catch (e) {
-                console.error('Failed to load n8n config:', e);
+    async loadConfig() {
+        if (window.CryptoUtils) {
+            const stored = await window.CryptoUtils.getItem('nox-n8n-config');
+            if (stored) {
+                this.config = stored;
+            }
+        } else {
+            // Fallback to unencrypted (for initial load)
+            const stored = localStorage.getItem('nox-n8n-config');
+            if (stored) {
+                try {
+                    this.config = JSON.parse(stored);
+                } catch (e) {
+                    console.error('Failed to load n8n config:', e);
+                }
             }
         }
     }
 
     /**
-     * Save configuration to localStorage
+     * Save configuration to encrypted localStorage
      */
-    saveConfig(config) {
+    async saveConfig(config) {
         // Trim trailing slashes from URLs
         if (config.n8nUrl) {
             config.n8nUrl = config.n8nUrl.replace(/\/+$/, '');
@@ -45,7 +53,13 @@ class N8NManager {
         }
 
         this.config = { ...this.config, ...config };
-        localStorage.setItem('nox-n8n-config', JSON.stringify(this.config));
+
+        if (window.CryptoUtils) {
+            await window.CryptoUtils.setItem('nox-n8n-config', this.config);
+        } else {
+            // Fallback to unencrypted
+            localStorage.setItem('nox-n8n-config', JSON.stringify(this.config));
+        }
     }
 
     /**

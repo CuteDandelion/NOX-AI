@@ -1,0 +1,135 @@
+/**
+ * Crypto Utilities for Secure Local Storage
+ * Encrypts sensitive data before storing in localStorage
+ */
+
+class CryptoUtils {
+    constructor() {
+        // Generate or retrieve encryption key from session
+        this.ensureEncryptionKey();
+    }
+
+    /**
+     * Ensure we have an encryption key for this session
+     */
+    ensureEncryptionKey() {
+        let keyData = sessionStorage.getItem('nox_enc_key');
+
+        if (!keyData) {
+            // Generate a new key for this session
+            const randomBytes = new Uint8Array(32);
+            crypto.getRandomValues(randomBytes);
+            keyData = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            sessionStorage.setItem('nox_enc_key', keyData);
+        }
+    }
+
+    /**
+     * Get the encryption key
+     */
+    async getKey() {
+        const keyData = sessionStorage.getItem('nox_enc_key');
+        const keyBytes = new Uint8Array(keyData.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+        return await crypto.subtle.importKey(
+            'raw',
+            keyBytes,
+            'AES-GCM',
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
+    /**
+     * Encrypt data
+     */
+    async encrypt(data) {
+        try {
+            const key = await this.getKey();
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const encoder = new TextEncoder();
+            const encoded = encoder.encode(JSON.stringify(data));
+
+            const encrypted = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                encoded
+            );
+
+            // Combine IV and encrypted data
+            const result = new Uint8Array(iv.length + encrypted.byteLength);
+            result.set(iv, 0);
+            result.set(new Uint8Array(encrypted), iv.length);
+
+            // Convert to base64
+            return btoa(String.fromCharCode(...result));
+        } catch (error) {
+            console.error('Encryption failed:', error);
+            // Fallback: return unencrypted data as JSON (for compatibility)
+            return JSON.stringify(data);
+        }
+    }
+
+    /**
+     * Decrypt data
+     */
+    async decrypt(encryptedData) {
+        try {
+            // Try to decrypt
+            const key = await this.getKey();
+            const data = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
+
+            const iv = data.slice(0, 12);
+            const encrypted = data.slice(12);
+
+            const decrypted = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                encrypted
+            );
+
+            const decoder = new TextDecoder();
+            return JSON.parse(decoder.decode(decrypted));
+        } catch (error) {
+            // Fallback: try to parse as unencrypted JSON (for backward compatibility)
+            try {
+                return JSON.parse(encryptedData);
+            } catch (e) {
+                console.error('Decryption failed:', error);
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Secure localStorage set
+     */
+    async setItem(key, value) {
+        const encrypted = await this.encrypt(value);
+        localStorage.setItem(key, encrypted);
+    }
+
+    /**
+     * Secure localStorage get
+     */
+    async getItem(key) {
+        const stored = localStorage.getItem(key);
+        if (!stored) return null;
+        return await this.decrypt(stored);
+    }
+
+    /**
+     * Clear encryption key (on logout)
+     */
+    clearKey() {
+        sessionStorage.removeItem('nox_enc_key');
+    }
+}
+
+// Create global instance
+window.CryptoUtils = new CryptoUtils();
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.CryptoUtils;
+}

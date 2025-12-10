@@ -62,6 +62,17 @@
             width: 80px;
             height: 80px;
             margin-bottom: 16px;
+            filter: drop-shadow(0 0 8px rgba(200, 220, 255, 0.4));
+            animation: glow 3s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% {
+                filter: drop-shadow(0 0 8px rgba(200, 220, 255, 0.4));
+            }
+            50% {
+                filter: drop-shadow(0 0 20px rgba(200, 220, 255, 0.8)) drop-shadow(0 0 30px rgba(102, 126, 234, 0.6));
+            }
         }
 
         h1 {
@@ -189,32 +200,44 @@
         <div class="logo-container">
             <svg class="logo-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-                        <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+                    <linearGradient id="silverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#e0e7ff;stop-opacity:1" />
+                        <stop offset="30%" style="stop-color:#c7d2fe;stop-opacity:1" />
+                        <stop offset="60%" style="stop-color:#a5b4fc;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#818cf8;stop-opacity:1" />
                     </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
                 </defs>
-                <!-- NOX hexagon logo -->
+                <!-- Hexagon background with gradient -->
                 <path d="M50 10 L85 30 L85 70 L50 90 L15 70 L15 30 Z"
-                      stroke="url(#logoGradient)"
-                      stroke-width="3"
-                      fill="rgba(102, 126, 234, 0.1)"/>
+                      stroke="url(#silverGradient)"
+                      stroke-width="2"
+                      fill="rgba(165, 180, 252, 0.08)"/>
                 <!-- N -->
-                <path d="M30 38 L30 62 M30 38 L40 62 M40 38 L40 62"
-                      stroke="url(#logoGradient)"
-                      stroke-width="3"
+                <path d="M28 36 L28 64 M28 36 L42 64 M42 36 L42 64"
+                      stroke="url(#silverGradient)"
+                      stroke-width="5"
                       stroke-linecap="round"
-                      stroke-linejoin="round"/>
+                      stroke-linejoin="round"
+                      filter="url(#glow)"/>
                 <!-- O -->
-                <circle cx="56" cy="50" r="10"
-                        stroke="url(#logoGradient)"
-                        stroke-width="3"
-                        fill="none"/>
+                <circle cx="58" cy="50" r="12"
+                        stroke="url(#silverGradient)"
+                        stroke-width="5"
+                        fill="none"
+                        filter="url(#glow)"/>
                 <!-- X -->
-                <path d="M68 38 L78 62 M78 38 L68 62"
-                      stroke="url(#logoGradient)"
-                      stroke-width="3"
-                      stroke-linecap="round"/>
+                <path d="M70 36 L82 64 M82 36 L70 64"
+                      stroke="url(#silverGradient)"
+                      stroke-width="5"
+                      stroke-linecap="round"
+                      filter="url(#glow)"/>
             </svg>
             <h1>NOX.AI</h1>
             <p class="subtitle">Secure Access Portal</p>
@@ -250,12 +273,6 @@
                 Sign In
             </button>
         </form>
-
-        <div class="default-credentials">
-            <strong>Default Credentials:</strong>
-            <div class="credential-item">Username: admin</div>
-            <div class="credential-item">Password: nox2024</div>
-        </div>
     </div>
 
     <script src="/nox/js/auth.js?v=4"></script>
