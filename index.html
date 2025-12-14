@@ -377,6 +377,12 @@
                         </svg>
                         Execute Query
                     </button>
+                    <div style="margin-top: 12px; font-size: 12px; color: var(--text-secondary);">
+                        <strong>Example queries:</strong><br>
+                        • All nodes: <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('cypherQuery').value='MATCH (n) RETURN n LIMIT 25'">MATCH (n) RETURN n LIMIT 25</code><br>
+                        • Node count: <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('cypherQuery').value='MATCH (n) RETURN count(n) as total'">MATCH (n) RETURN count(n) as total</code><br>
+                        • With relationships: <code style="background: var(--bg-primary); padding: 2px 6px; border-radius: 4px; cursor: pointer;" onclick="document.getElementById('cypherQuery').value='MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 25'">MATCH (n)-[r]->(m) RETURN n,r,m LIMIT 25</code>
+                    </div>
                 </div>
                 <div id="graphCanvas" class="graph-canvas">
                     <!-- Neo4j graph will be rendered here -->

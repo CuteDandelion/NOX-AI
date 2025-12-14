@@ -849,7 +849,7 @@ class NOXApp {
             // Parse URL to extract encryption settings
             let serverUrl = neo4jUrl;
             let encrypted = false;
-            let trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
+            let trust = 'TRUST_ALL_CERTIFICATES';
 
             if (serverUrl.includes('+ssc')) {
                 encrypted = true;
@@ -861,37 +861,68 @@ class NOXApp {
                 serverUrl = serverUrl.replace('+s', '');
             }
 
-            // Create a simple Neo4j driver instance for testing
-            const neo4j = window.neo4j || window.Neo4j;
-            if (!neo4j) {
-                throw new Error('Neo4j driver not available. Please check if neovis.js is loaded.');
+            // Create a hidden test container
+            const testContainer = document.createElement('div');
+            testContainer.id = 'neo4j-test-container';
+            testContainer.style.display = 'none';
+            document.body.appendChild(testContainer);
+
+            // Try to create a NeoVis instance to test connection
+            if (!window.NeoVis) {
+                throw new Error('NeoVis library not loaded. Please refresh the page.');
             }
 
-            const driverConfig = encrypted ? {
-                encrypted: 'ENCRYPTION_ON',
-                trust: trust
-            } : {};
+            const config = {
+                containerId: 'neo4j-test-container',
+                neo4j: {
+                    serverUrl: serverUrl,
+                    serverUser: username,
+                    serverPassword: password,
+                    driverConfig: encrypted ? {
+                        encrypted: 'ENCRYPTION_ON',
+                        trust: trust
+                    } : {}
+                },
+                visConfig: {},
+                initialCypher: 'RETURN 1 as test',
+                database: database
+            };
 
-            const driver = neo4j.driver(serverUrl, neo4j.auth.basic(username, password), driverConfig);
+            const viz = new window.NeoVis.default(config);
 
-            // Try to verify connectivity
-            const session = driver.session({ database: database });
+            // Listen for completion or error
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Connection test timeout (10s)'));
+                }, 10000);
 
-            try {
-                const result = await session.run('RETURN 1 as test');
-                const testValue = result.records[0].get('test').toNumber();
+                viz.registerOnEvent('completed', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                });
 
-                if (testValue === 1) {
-                    this.updateConnectionStatus('neo4jTestStatus', `✅ Connected successfully to database: ${database}`, 'success');
-                } else {
-                    this.updateConnectionStatus('neo4jTestStatus', 'Connection test returned unexpected result', 'error');
-                }
-            } finally {
-                await session.close();
-                await driver.close();
-            }
+                viz.registerOnEvent('error', (error) => {
+                    clearTimeout(timeout);
+                    reject(error);
+                });
+
+                viz.render();
+            });
+
+            // Clean up
+            document.body.removeChild(testContainer);
+
+            this.updateConnectionStatus('neo4jTestStatus', `✅ Connected successfully to database: ${database}`, 'success');
+
         } catch (error) {
             console.error('Neo4j connection error:', error);
+
+            // Clean up on error
+            const testContainer = document.getElementById('neo4j-test-container');
+            if (testContainer) {
+                document.body.removeChild(testContainer);
+            }
+
             this.updateConnectionStatus('neo4jTestStatus', `Connection error: ${error.message}`, 'error');
         }
     }
@@ -953,11 +984,28 @@ class NOXApp {
 
             // Initialize or update visualization
             if (!neo4jManager.viz) {
-                await neo4jManager.initializeVisualization('graphCanvas', query, database);
-                this.updateGraphStatus(`Query executed successfully. Rendering graph from database: ${database}`, 'success');
+                const viz = await neo4jManager.initializeVisualization('graphCanvas', query, database);
+
+                // Add event listeners for better feedback
+                viz.registerOnEvent('completed', () => {
+                    const network = viz._network;
+                    const nodeCount = network ? network.body.data.nodes.length : 0;
+                    const edgeCount = network ? network.body.data.edges.length : 0;
+
+                    if (nodeCount === 0) {
+                        this.updateGraphStatus(`Query completed but no nodes found. Try: MATCH (n) RETURN n LIMIT 10`, 'error');
+                    } else {
+                        this.updateGraphStatus(`✅ Graph rendered: ${nodeCount} node(s), ${edgeCount} relationship(s) | Database: ${database}`, 'success');
+                    }
+                });
+
+                viz.registerOnEvent('error', (error) => {
+                    this.updateGraphStatus(`Rendering error: ${error.error_msg || error.message || 'Unknown error'}`, 'error');
+                });
+
             } else {
                 await neo4jManager.executeQuery(query, database);
-                this.updateGraphStatus(`Query executed successfully. Database: ${database}`, 'success');
+                this.updateGraphStatus(`Query executed. Check graph above. | Database: ${database}`, 'success');
             }
         } catch (error) {
             console.error('Graph query error:', error);
