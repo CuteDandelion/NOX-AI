@@ -1460,3 +1460,44 @@ body {
 .graph-status.error::before {
     content: "❌";
 }
+
+/* ==================== Connection Test Status ==================== */
+.connection-status {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.connection-status.testing {
+    background: rgba(102, 126, 234, 0.1);
+    border: 1px solid var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.connection-status.testing::before {
+    content: "⏳";
+}
+
+.connection-status.success {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid #4caf50;
+    color: #4caf50;
+}
+
+.connection-status.success::before {
+    content: "✅";
+}
+
+.connection-status.error {
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid #ff6b6b;
+    color: #ff6b6b;
+}
+
+.connection-status.error::before {
+    content: "❌";
+}
