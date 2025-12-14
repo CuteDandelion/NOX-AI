@@ -96,6 +96,14 @@ class NOXApp {
         // Logout
         document.getElementById('logoutButton').addEventListener('click', () => window.AuthManager.logout());
 
+        // Graph View
+        document.getElementById('graphViewBtn').addEventListener('click', () => this.openGraphView());
+        document.getElementById('closeGraphView').addEventListener('click', () => this.closeGraphView());
+        document.getElementById('executeQuery').addEventListener('click', () => this.executeGraphQuery());
+        document.getElementById('refreshGraph').addEventListener('click', () => this.refreshGraph());
+        document.getElementById('clearGraph').addEventListener('click', () => this.clearGraph());
+        document.getElementById('stabilizeGraph').addEventListener('click', () => this.stabilizeGraph());
+
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
         document.getElementById('refreshWorkflows').addEventListener('click', () => this.loadWorkflows());
@@ -741,10 +749,19 @@ class NOXApp {
     // ==================== Settings ====================
 
     openSettings() {
-        const config = n8nManager.getConfig();
-        document.getElementById('n8nUrl').value = config.n8nUrl || '';
-        document.getElementById('webhookUrl').value = config.webhookUrl || '';
-        document.getElementById('apiKey').value = config.apiKey || '';
+        // Load n8n config
+        const n8nConfig = n8nManager.getConfig();
+        document.getElementById('n8nUrl').value = n8nConfig.n8nUrl || '';
+        document.getElementById('webhookUrl').value = n8nConfig.webhookUrl || '';
+        document.getElementById('apiKey').value = n8nConfig.apiKey || '';
+
+        // Load Neo4j config
+        const neo4jConfig = neo4jManager.getConfig();
+        document.getElementById('neo4jUrl').value = neo4jConfig.neo4jUrl || '';
+        document.getElementById('neo4jUsername').value = neo4jConfig.neo4jUsername || '';
+        document.getElementById('neo4jPassword').value = neo4jConfig.neo4jPassword || '';
+        document.getElementById('neo4jDatabase').value = neo4jConfig.neo4jDatabase || 'neo4j';
+
         this.settingsModal.classList.remove('hidden');
     }
 
@@ -753,15 +770,125 @@ class NOXApp {
     }
 
     async saveSettings() {
-        const config = {
+        // Save n8n config
+        const n8nConfig = {
             n8nUrl: document.getElementById('n8nUrl').value.trim(),
             webhookUrl: document.getElementById('webhookUrl').value.trim(),
             apiKey: document.getElementById('apiKey').value.trim()
         };
+        await n8nManager.saveConfig(n8nConfig);
 
-        await n8nManager.saveConfig(config);
+        // Save Neo4j config
+        const neo4jConfig = {
+            neo4jUrl: document.getElementById('neo4jUrl').value.trim(),
+            neo4jUsername: document.getElementById('neo4jUsername').value.trim(),
+            neo4jPassword: document.getElementById('neo4jPassword').value.trim(),
+            neo4jDatabase: document.getElementById('neo4jDatabase').value.trim() || 'neo4j'
+        };
+        await neo4jManager.saveConfig(neo4jConfig);
+
         this.closeSettings();
-        this.addSystemMessage('Settings saved successfully! Configuration is now encrypted.');
+        this.addSystemMessage('Settings saved successfully! All configurations are now encrypted.');
+    }
+
+    // ==================== Graph View ====================
+
+    openGraphView() {
+        const config = neo4jManager.getConfig();
+
+        // Check if Neo4j is configured
+        if (!config.neo4jUrl || !config.neo4jUsername || !config.neo4jPassword) {
+            this.addSystemMessage('⚠️ Neo4j not configured. Please configure Neo4j settings first.');
+            this.openSettings();
+            return;
+        }
+
+        // Set default database
+        const dbSelect = document.getElementById('graphDatabase');
+        dbSelect.value = config.neo4jDatabase || 'neo4j';
+
+        // Clear previous query and status
+        document.getElementById('cypherQuery').value = 'MATCH (n) RETURN n LIMIT 25';
+        this.updateGraphStatus('Ready. Enter a Cypher query and click "Execute Query".');
+
+        // Show modal
+        document.getElementById('graphViewModal').classList.remove('hidden');
+    }
+
+    closeGraphView() {
+        document.getElementById('graphViewModal').classList.add('hidden');
+
+        // Clear the graph
+        if (neo4jManager.viz) {
+            neo4jManager.clearVisualization();
+        }
+    }
+
+    async executeGraphQuery() {
+        const query = document.getElementById('cypherQuery').value.trim();
+        const database = document.getElementById('graphDatabase').value;
+
+        if (!query) {
+            this.updateGraphStatus('Please enter a Cypher query.', 'error');
+            return;
+        }
+
+        try {
+            this.updateGraphStatus('Executing query...', 'loading');
+
+            // Initialize or update visualization
+            if (!neo4jManager.viz) {
+                await neo4jManager.initializeVisualization('graphCanvas', query, database);
+                this.updateGraphStatus(`Query executed successfully. Rendering graph from database: ${database}`, 'success');
+            } else {
+                await neo4jManager.executeQuery(query, database);
+                this.updateGraphStatus(`Query executed successfully. Database: ${database}`, 'success');
+            }
+        } catch (error) {
+            console.error('Graph query error:', error);
+            this.updateGraphStatus(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    async refreshGraph() {
+        const query = document.getElementById('cypherQuery').value.trim();
+
+        if (!query) {
+            this.updateGraphStatus('Please enter a Cypher query first.', 'error');
+            return;
+        }
+
+        // Clear and re-execute
+        this.clearGraph();
+        await this.executeGraphQuery();
+    }
+
+    clearGraph() {
+        if (neo4jManager.viz) {
+            neo4jManager.clearVisualization();
+            this.updateGraphStatus('Graph cleared. Ready for new query.');
+        }
+    }
+
+    stabilizeGraph() {
+        if (neo4jManager.viz) {
+            neo4jManager.stabilize();
+            this.updateGraphStatus('Stabilizing graph layout...', 'loading');
+            setTimeout(() => {
+                this.updateGraphStatus('Graph stabilized.', 'success');
+            }, 2000);
+        } else {
+            this.updateGraphStatus('No graph to stabilize. Execute a query first.', 'error');
+        }
+    }
+
+    updateGraphStatus(message, type = '') {
+        const statusEl = document.getElementById('graphStatus');
+        statusEl.textContent = message;
+        statusEl.className = 'graph-status';
+        if (type) {
+            statusEl.classList.add(type);
+        }
     }
 
     // ==================== Utilities ====================
