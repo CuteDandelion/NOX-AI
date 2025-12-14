@@ -1363,3 +1363,100 @@ body {
     content: "";
     margin-top: 0.5em;
 }
+
+/* ==================== Graph View Modal ==================== */
+.graph-modal-content {
+    width: 90vw;
+    height: 85vh;
+    max-width: none;
+    max-height: none;
+}
+
+.graph-modal-body {
+    display: flex;
+    flex-direction: column;
+    height: calc(85vh - 80px);
+    padding: 0;
+}
+
+.graph-controls {
+    padding: 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.graph-control-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.graph-select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.graph-select:focus {
+    border-color: var(--accent-primary);
+}
+
+.graph-query-input {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 80px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.graph-query-input:focus {
+    border-color: var(--accent-primary);
+}
+
+.graph-canvas {
+    flex: 1;
+    background: var(--bg-primary);
+    position: relative;
+    overflow: hidden;
+}
+
+.graph-status {
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.graph-status.loading::before {
+    content: "⏳";
+}
+
+.graph-status.success::before {
+    content: "✅";
+}
+
+.graph-status.error {
+    color: #ff6b6b;
+}
+
+.graph-status.error::before {
+    content: "❌";
+}

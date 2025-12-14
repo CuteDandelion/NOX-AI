@@ -137,7 +137,7 @@ class CryptoUtils {
      * This runs once to encrypt existing plain text data
      */
     async migrateAllData() {
-        const sensitiveKeys = ['nox-chats', 'nox-n8n-config'];
+        const sensitiveKeys = ['nox-chats', 'nox-n8n-config', 'nox-neo4j-config'];
         let migratedCount = 0;
 
         for (const key of sensitiveKeys) {
