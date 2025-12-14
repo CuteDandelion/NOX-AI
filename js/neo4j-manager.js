@@ -1,6 +1,6 @@
 /**
- * Neo4j Integration Module
- * Handles Neo4j graph database connections and visualization
+ * Neo4j Integration Module (HTTP API)
+ * Handles Neo4j graph database connections via HTTP API and vis.js visualization
  */
 
 class Neo4jManager {
@@ -12,8 +12,9 @@ class Neo4jManager {
             neo4jDatabase: 'neo4j'
         };
 
-        this.driver = null;
-        this.viz = null;
+        this.network = null;
+        this.nodes = null;
+        this.edges = null;
 
         // Load config asynchronously
         this.init();
@@ -52,11 +53,6 @@ class Neo4jManager {
      * Save configuration to encrypted localStorage
      */
     async saveConfig(config) {
-        // Trim trailing slashes from URL
-        if (config.neo4jUrl) {
-            config.neo4jUrl = config.neo4jUrl.replace(/\/+$/, '');
-        }
-
         this.config = { ...this.config, ...config };
 
         if (window.CryptoUtils) {
@@ -75,175 +71,367 @@ class Neo4jManager {
     }
 
     /**
-     * Test Neo4j connection
+     * Execute Cypher query via HTTP API
+     * @param {string} cypherQuery - Cypher query to execute
+     * @returns {Promise<Object>} - Query results
      */
-    async testConnection() {
+    async executeQuery(cypherQuery) {
         if (!this.config.neo4jUrl || !this.config.neo4jUsername || !this.config.neo4jPassword) {
-            throw new Error('Neo4j connection details are incomplete. Please check settings.');
+            throw new Error('Neo4j not configured. Please check settings.');
         }
 
+        const authHeader = 'Basic ' + btoa(`${this.config.neo4jUsername}:${this.config.neo4jPassword}`);
+
         try {
-            // For now, return a success message
-            // Actual connection will be handled by neovis.js in the graph view
-            return {
-                success: true,
-                message: 'Configuration saved. Connection will be tested when opening graph view.',
-                config: {
-                    url: this.config.neo4jUrl,
-                    database: this.config.neo4jDatabase
-                }
-            };
+            const response = await fetch(this.config.neo4jUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeader,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    statements: [{
+                        statement: cypherQuery,
+                        resultDataContents: ['row', 'graph'],
+                        includeStats: true
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const data = await response.json();
+
+            // Check for Neo4j errors
+            if (data.errors && data.errors.length > 0) {
+                const error = data.errors[0];
+                throw new Error(`Neo4j Error: ${error.message} (${error.code})`);
+            }
+
+            return data;
         } catch (error) {
-            console.error('Neo4j connection test failed:', error);
+            console.error('Neo4j query error:', error);
             throw error;
         }
     }
 
     /**
-     * Initialize visualization with neovis.js
+     * Initialize visualization with vis.js
      * @param {string} containerId - DOM element ID for the graph container
      * @param {string} cypherQuery - Cypher query to execute
-     * @param {string} database - Database to query (optional)
      */
-    async initializeVisualization(containerId, cypherQuery, database = null) {
-        if (!this.config.neo4jUrl || !this.config.neo4jUsername || !this.config.neo4jPassword) {
-            throw new Error('Neo4j connection not configured. Please check settings.');
+    async initializeVisualization(containerId, cypherQuery) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            throw new Error(`Container ${containerId} not found`);
         }
 
-        const db = database || this.config.neo4jDatabase;
+        // Execute query
+        const result = await this.executeQuery(cypherQuery);
 
-        try {
-            // Parse URL to extract encryption settings and normalize
-            let serverUrl = this.config.neo4jUrl;
-            let encrypted = false;
-            let trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
+        // Parse graph data
+        const graphData = this.parseGraphData(result);
 
-            // Check for encryption in URL scheme
-            if (serverUrl.includes('+ssc')) {
-                encrypted = true;
-                trust = 'TRUST_ALL_CERTIFICATES';
-                serverUrl = serverUrl.replace('+ssc', '');
-            } else if (serverUrl.includes('+s')) {
-                encrypted = true;
-                trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
-                serverUrl = serverUrl.replace('+s', '');
-            }
-
-            // Configure neovis
-            const config = {
-                containerId: containerId,
-                neo4j: {
-                    serverUrl: serverUrl,
-                    serverUser: this.config.neo4jUsername,
-                    serverPassword: this.config.neo4jPassword,
-                    driverConfig: encrypted ? {
-                        encrypted: 'ENCRYPTION_ON',
-                        trust: trust
-                    } : {}
-                },
-                visConfig: {
-                    nodes: {
-                        shape: 'dot',
-                        size: 25,
-                        font: {
-                            size: 14,
-                            color: '#e1e4e8'
-                        },
-                        borderWidth: 2,
-                        borderWidthSelected: 4
-                    },
-                    edges: {
-                        arrows: {
-                            to: { enabled: true, scaleFactor: 0.5 }
-                        },
-                        color: {
-                            color: '#667eea',
-                            highlight: '#818cf8',
-                            hover: '#a5b4fc'
-                        },
-                        font: {
-                            size: 12,
-                            color: '#9ca3af',
-                            align: 'top'
-                        },
-                        smooth: {
-                            enabled: true,
-                            type: 'dynamic'
-                        }
-                    },
-                    interaction: {
-                        hover: true,
-                        navigationButtons: true,
-                        keyboard: true,
-                        tooltipDelay: 200
-                    },
-                    physics: {
-                        enabled: true,
-                        stabilization: {
-                            iterations: 200
-                        },
-                        barnesHut: {
-                            gravitationalConstant: -8000,
-                            springConstant: 0.04,
-                            springLength: 95
-                        }
+        // Configure vis.js options for beautiful graph
+        const options = {
+            nodes: {
+                shape: 'dot',
+                size: 20,
+                font: {
+                    size: 14,
+                    color: '#e1e4e8',
+                    face: 'system-ui, -apple-system, sans-serif',
+                    bold: {
+                        color: '#ffffff'
                     }
                 },
-                labels: {},
-                relationships: {},
-                initialCypher: cypherQuery,
-                database: db
-            };
-
-            // Create new NeoVis instance
-            if (window.NeoVis) {
-                this.viz = new window.NeoVis.default(config);
-
-                // Render the graph
-                this.viz.render();
-
-                return this.viz;
-            } else {
-                throw new Error('NeoVis library not loaded. Please check if neovis.js is included.');
+                borderWidth: 2,
+                borderWidthSelected: 4,
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(102, 126, 234, 0.3)',
+                    size: 10,
+                    x: 0,
+                    y: 0
+                },
+                color: {
+                    border: '#667eea',
+                    background: 'rgba(102, 126, 234, 0.2)',
+                    highlight: {
+                        border: '#818cf8',
+                        background: 'rgba(129, 140, 248, 0.3)'
+                    },
+                    hover: {
+                        border: '#a5b4fc',
+                        background: 'rgba(165, 180, 252, 0.3)'
+                    }
+                }
+            },
+            edges: {
+                width: 2,
+                color: {
+                    color: 'rgba(102, 126, 234, 0.5)',
+                    highlight: 'rgba(129, 140, 248, 0.8)',
+                    hover: 'rgba(165, 180, 252, 0.6)'
+                },
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 0.8,
+                        type: 'arrow'
+                    }
+                },
+                smooth: {
+                    enabled: true,
+                    type: 'dynamic',
+                    roundness: 0.5
+                },
+                font: {
+                    size: 12,
+                    color: '#9ca3af',
+                    strokeWidth: 0,
+                    align: 'middle',
+                    face: 'system-ui, -apple-system, sans-serif'
+                },
+                shadow: {
+                    enabled: true,
+                    color: 'rgba(102, 126, 234, 0.2)',
+                    size: 5,
+                    x: 0,
+                    y: 0
+                }
+            },
+            physics: {
+                enabled: true,
+                barnesHut: {
+                    gravitationalConstant: -8000,
+                    centralGravity: 0.3,
+                    springLength: 150,
+                    springConstant: 0.04,
+                    damping: 0.09,
+                    avoidOverlap: 0.5
+                },
+                stabilization: {
+                    enabled: true,
+                    iterations: 200,
+                    updateInterval: 25
+                }
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100,
+                navigationButtons: true,
+                keyboard: true,
+                zoomView: true,
+                dragView: true
+            },
+            layout: {
+                improvedLayout: true,
+                randomSeed: 42
             }
-        } catch (error) {
-            console.error('Failed to initialize Neo4j visualization:', error);
-            throw error;
-        }
+        };
+
+        // Create network
+        this.nodes = new vis.DataSet(graphData.nodes);
+        this.edges = new vis.DataSet(graphData.edges);
+
+        const data = {
+            nodes: this.nodes,
+            edges: this.edges
+        };
+
+        this.network = new vis.Network(container, data, options);
+
+        // Add event listeners for interactivity
+        this.network.on('click', (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = this.nodes.get(nodeId);
+                console.log('Node clicked:', node);
+            }
+        });
+
+        return {
+            nodeCount: graphData.nodes.length,
+            edgeCount: graphData.edges.length
+        };
     }
 
     /**
-     * Execute a Cypher query and update visualization
+     * Parse Neo4j HTTP API response into vis.js format
+     * @param {Object} result - Neo4j HTTP API response
+     * @returns {Object} - {nodes: [], edges: []}
      */
-    async executeQuery(cypherQuery, database = null) {
-        if (!this.viz) {
-            throw new Error('Visualization not initialized. Call initializeVisualization first.');
+    parseGraphData(result) {
+        const nodesMap = new Map();
+        const edgesArray = [];
+
+        if (!result.results || result.results.length === 0) {
+            return { nodes: [], edges: [] };
         }
 
-        try {
-            // Update the query and re-render
-            this.viz.updateWithCypher(cypherQuery);
-        } catch (error) {
-            console.error('Failed to execute query:', error);
-            throw error;
+        const statement = result.results[0];
+
+        // Process graph data if available
+        if (statement.data) {
+            statement.data.forEach((record) => {
+                if (record.graph) {
+                    // Process nodes
+                    record.graph.nodes.forEach((node) => {
+                        if (!nodesMap.has(node.id)) {
+                            const label = this.getNodeLabel(node);
+                            const color = this.getNodeColor(node.labels);
+
+                            nodesMap.set(node.id, {
+                                id: node.id,
+                                label: label,
+                                title: this.getNodeTooltip(node),
+                                color: color,
+                                size: 20 + (Object.keys(node.properties).length * 2)
+                            });
+                        }
+                    });
+
+                    // Process relationships
+                    record.graph.relationships.forEach((rel) => {
+                        edgesArray.push({
+                            id: rel.id,
+                            from: rel.startNode,
+                            to: rel.endNode,
+                            label: rel.type,
+                            title: this.getEdgeTooltip(rel),
+                            arrows: 'to'
+                        });
+                    });
+                }
+            });
         }
+
+        return {
+            nodes: Array.from(nodesMap.values()),
+            edges: edgesArray
+        };
     }
 
     /**
-     * Clear the current visualization
+     * Get label for node
+     */
+    getNodeLabel(node) {
+        // Try common label properties
+        const labelProps = ['name', 'title', 'label', 'id'];
+        for (const prop of labelProps) {
+            if (node.properties[prop]) {
+                return String(node.properties[prop]);
+            }
+        }
+
+        // Fallback to first label or ID
+        return node.labels[0] || `Node ${node.id}`;
+    }
+
+    /**
+     * Get color for node based on labels
+     */
+    getNodeColor(labels) {
+        const colors = {
+            'Person': { border: '#818cf8', background: 'rgba(129, 140, 248, 0.3)' },
+            'User': { border: '#60a5fa', background: 'rgba(96, 165, 250, 0.3)' },
+            'Product': { border: '#34d399', background: 'rgba(52, 211, 153, 0.3)' },
+            'Order': { border: '#fbbf24', background: 'rgba(251, 191, 36, 0.3)' },
+            'Company': { border: '#f472b6', background: 'rgba(244, 114, 182, 0.3)' },
+            'Location': { border: '#fb7185', background: 'rgba(251, 113, 133, 0.3)' }
+        };
+
+        // Find matching label
+        for (const label of labels) {
+            if (colors[label]) {
+                return colors[label];
+            }
+        }
+
+        // Default color
+        return { border: '#667eea', background: 'rgba(102, 126, 234, 0.2)' };
+    }
+
+    /**
+     * Get tooltip HTML for node
+     */
+    getNodeTooltip(node) {
+        let html = `<strong>${node.labels.join(', ')}</strong><br>`;
+        Object.entries(node.properties).forEach(([key, value]) => {
+            html += `${key}: ${value}<br>`;
+        });
+        return html;
+    }
+
+    /**
+     * Get tooltip for edge
+     */
+    getEdgeTooltip(rel) {
+        let html = `<strong>${rel.type}</strong><br>`;
+        if (rel.properties && Object.keys(rel.properties).length > 0) {
+            Object.entries(rel.properties).forEach(([key, value]) => {
+                html += `${key}: ${value}<br>`;
+            });
+        }
+        return html;
+    }
+
+    /**
+     * Update visualization with new query
+     */
+    async updateVisualization(cypherQuery) {
+        if (!this.network) {
+            throw new Error('Network not initialized');
+        }
+
+        const result = await this.executeQuery(cypherQuery);
+        const graphData = this.parseGraphData(result);
+
+        this.nodes.clear();
+        this.edges.clear();
+
+        this.nodes.add(graphData.nodes);
+        this.edges.add(graphData.edges);
+
+        return {
+            nodeCount: graphData.nodes.length,
+            edgeCount: graphData.edges.length
+        };
+    }
+
+    /**
+     * Clear visualization
      */
     clearVisualization() {
-        if (this.viz) {
-            this.viz.clearNetwork();
+        if (this.nodes) this.nodes.clear();
+        if (this.edges) this.edges.clear();
+    }
+
+    /**
+     * Stabilize graph layout
+     */
+    stabilize() {
+        if (this.network) {
+            this.network.stabilize();
         }
     }
 
     /**
-     * Stabilize the graph layout
+     * Fit graph to view
      */
-    stabilize() {
-        if (this.viz && this.viz._network) {
-            this.viz._network.stabilize();
+    fit() {
+        if (this.network) {
+            this.network.fit({
+                animation: {
+                    duration: 1000,
+                    easingFunction: 'easeInOutQuad'
+                }
+            });
         }
     }
 }
