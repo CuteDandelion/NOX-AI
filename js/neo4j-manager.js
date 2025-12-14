@@ -119,10 +119,9 @@ class Neo4jManager {
                 neo4j: {
                     serverUrl: this.config.neo4jUrl,
                     serverUser: this.config.neo4jUsername,
-                    serverPassword: this.config.neo4jPassword,
-                    driverConfig: {
-                        encrypted: this.config.neo4jUrl.includes('+s') ? 'ENCRYPTION_ON' : 'ENCRYPTION_OFF'
-                    }
+                    serverPassword: this.config.neo4jPassword
+                    // Note: Encryption is handled by URL scheme (neo4j+s:// or neo4j+ssc://)
+                    // Don't specify driverConfig.encrypted to avoid conflicts
                 },
                 visConfig: {
                     nodes: {
