@@ -93,6 +93,10 @@ class NOXApp {
         document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
         document.getElementById('cancelSettings').addEventListener('click', () => this.closeSettings());
 
+        // Connection tests
+        document.getElementById('testN8nConnection').addEventListener('click', () => this.testN8nConnection());
+        document.getElementById('testNeo4jConnection').addEventListener('click', () => this.testNeo4jConnection());
+
         // Logout
         document.getElementById('logoutButton').addEventListener('click', () => window.AuthManager.logout());
 
@@ -789,6 +793,117 @@ class NOXApp {
 
         this.closeSettings();
         this.addSystemMessage('Settings saved successfully! All configurations are now encrypted.');
+    }
+
+    async testN8nConnection() {
+        const statusEl = document.getElementById('n8nTestStatus');
+        const n8nUrl = document.getElementById('n8nUrl').value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+
+        if (!n8nUrl) {
+            this.updateConnectionStatus('n8nTestStatus', 'Please enter n8n URL', 'error');
+            return;
+        }
+
+        this.updateConnectionStatus('n8nTestStatus', 'Testing n8n connection...', 'testing');
+
+        try {
+            // Test connection to n8n API
+            const url = `${n8nUrl}/api/v1/workflows`;
+            const headers = {};
+            if (apiKey) {
+                headers['X-N8N-API-KEY'] = apiKey;
+            }
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: headers,
+                mode: 'cors'
+            });
+
+            if (response.ok) {
+                this.updateConnectionStatus('n8nTestStatus', `✅ Connected successfully! (${response.status})`, 'success');
+            } else {
+                this.updateConnectionStatus('n8nTestStatus', `Connection failed: ${response.status} ${response.statusText}`, 'error');
+            }
+        } catch (error) {
+            this.updateConnectionStatus('n8nTestStatus', `Connection error: ${error.message}`, 'error');
+        }
+    }
+
+    async testNeo4jConnection() {
+        const statusEl = document.getElementById('neo4jTestStatus');
+        const neo4jUrl = document.getElementById('neo4jUrl').value.trim();
+        const username = document.getElementById('neo4jUsername').value.trim();
+        const password = document.getElementById('neo4jPassword').value.trim();
+        const database = document.getElementById('neo4jDatabase').value.trim() || 'neo4j';
+
+        if (!neo4jUrl || !username || !password) {
+            this.updateConnectionStatus('neo4jTestStatus', 'Please fill in all Neo4j fields', 'error');
+            return;
+        }
+
+        this.updateConnectionStatus('neo4jTestStatus', 'Testing Neo4j connection...', 'testing');
+
+        try {
+            // Parse URL to extract encryption settings
+            let serverUrl = neo4jUrl;
+            let encrypted = false;
+            let trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
+
+            if (serverUrl.includes('+ssc')) {
+                encrypted = true;
+                trust = 'TRUST_ALL_CERTIFICATES';
+                serverUrl = serverUrl.replace('+ssc', '');
+            } else if (serverUrl.includes('+s')) {
+                encrypted = true;
+                trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
+                serverUrl = serverUrl.replace('+s', '');
+            }
+
+            // Create a simple Neo4j driver instance for testing
+            const neo4j = window.neo4j || window.Neo4j;
+            if (!neo4j) {
+                throw new Error('Neo4j driver not available. Please check if neovis.js is loaded.');
+            }
+
+            const driverConfig = encrypted ? {
+                encrypted: 'ENCRYPTION_ON',
+                trust: trust
+            } : {};
+
+            const driver = neo4j.driver(serverUrl, neo4j.auth.basic(username, password), driverConfig);
+
+            // Try to verify connectivity
+            const session = driver.session({ database: database });
+
+            try {
+                const result = await session.run('RETURN 1 as test');
+                const testValue = result.records[0].get('test').toNumber();
+
+                if (testValue === 1) {
+                    this.updateConnectionStatus('neo4jTestStatus', `✅ Connected successfully to database: ${database}`, 'success');
+                } else {
+                    this.updateConnectionStatus('neo4jTestStatus', 'Connection test returned unexpected result', 'error');
+                }
+            } finally {
+                await session.close();
+                await driver.close();
+            }
+        } catch (error) {
+            console.error('Neo4j connection error:', error);
+            this.updateConnectionStatus('neo4jTestStatus', `Connection error: ${error.message}`, 'error');
+        }
+    }
+
+    updateConnectionStatus(elementId, message, type) {
+        const statusEl = document.getElementById(elementId);
+        statusEl.textContent = message;
+        statusEl.className = 'connection-status';
+        statusEl.style.display = 'flex';
+        if (type) {
+            statusEl.classList.add(type);
+        }
     }
 
     // ==================== Graph View ====================

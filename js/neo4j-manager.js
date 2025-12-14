@@ -113,15 +113,33 @@ class Neo4jManager {
         const db = database || this.config.neo4jDatabase;
 
         try {
+            // Parse URL to extract encryption settings and normalize
+            let serverUrl = this.config.neo4jUrl;
+            let encrypted = false;
+            let trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
+
+            // Check for encryption in URL scheme
+            if (serverUrl.includes('+ssc')) {
+                encrypted = true;
+                trust = 'TRUST_ALL_CERTIFICATES';
+                serverUrl = serverUrl.replace('+ssc', '');
+            } else if (serverUrl.includes('+s')) {
+                encrypted = true;
+                trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
+                serverUrl = serverUrl.replace('+s', '');
+            }
+
             // Configure neovis
             const config = {
                 containerId: containerId,
                 neo4j: {
-                    serverUrl: this.config.neo4jUrl,
+                    serverUrl: serverUrl,
                     serverUser: this.config.neo4jUsername,
-                    serverPassword: this.config.neo4jPassword
-                    // Note: Encryption is handled by URL scheme (neo4j+s:// or neo4j+ssc://)
-                    // Don't specify driverConfig.encrypted to avoid conflicts
+                    serverPassword: this.config.neo4jPassword,
+                    driverConfig: encrypted ? {
+                        encrypted: 'ENCRYPTION_ON',
+                        trust: trust
+                    } : {}
                 },
                 visConfig: {
                     nodes: {
