@@ -832,7 +832,6 @@ class NOXApp {
     }
 
     async testNeo4jConnection() {
-        const statusEl = document.getElementById('neo4jTestStatus');
         const neo4jUrl = document.getElementById('neo4jUrl').value.trim();
         const username = document.getElementById('neo4jUsername').value.trim();
         const password = document.getElementById('neo4jPassword').value.trim();
@@ -843,86 +842,48 @@ class NOXApp {
             return;
         }
 
-        this.updateConnectionStatus('neo4jTestStatus', 'Testing Neo4j connection...', 'testing');
+        this.updateConnectionStatus('neo4jTestStatus', 'Testing Neo4j connection via HTTP API...', 'testing');
 
         try {
-            // Parse URL to extract encryption settings
-            let serverUrl = neo4jUrl;
-            let encrypted = false;
-            let trust = 'TRUST_ALL_CERTIFICATES';
+            // Test connection via HTTP API
+            const authHeader = 'Basic ' + btoa(`${username}:${password}`);
 
-            if (serverUrl.includes('+ssc')) {
-                encrypted = true;
-                trust = 'TRUST_ALL_CERTIFICATES';
-                serverUrl = serverUrl.replace('+ssc', '');
-            } else if (serverUrl.includes('+s')) {
-                encrypted = true;
-                trust = 'TRUST_SYSTEM_CA_SIGNED_CERTIFICATES';
-                serverUrl = serverUrl.replace('+s', '');
-            }
-
-            // Create a hidden test container
-            const testContainer = document.createElement('div');
-            testContainer.id = 'neo4j-test-container';
-            testContainer.style.display = 'none';
-            document.body.appendChild(testContainer);
-
-            // Try to create a NeoVis instance to test connection
-            if (!window.NeoVis) {
-                throw new Error('NeoVis library not loaded. Please refresh the page.');
-            }
-
-            const config = {
-                containerId: 'neo4j-test-container',
-                neo4j: {
-                    serverUrl: serverUrl,
-                    serverUser: username,
-                    serverPassword: password,
-                    driverConfig: encrypted ? {
-                        encrypted: 'ENCRYPTION_ON',
-                        trust: trust
-                    } : {}
+            const response = await fetch(neo4jUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeader,
+                    'Accept': 'application/json'
                 },
-                visConfig: {},
-                initialCypher: 'RETURN 1 as test',
-                database: database
-            };
-
-            const viz = new window.NeoVis.default(config);
-
-            // Listen for completion or error
-            await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Connection test timeout (10s)'));
-                }, 10000);
-
-                viz.registerOnEvent('completed', () => {
-                    clearTimeout(timeout);
-                    resolve();
-                });
-
-                viz.registerOnEvent('error', (error) => {
-                    clearTimeout(timeout);
-                    reject(error);
-                });
-
-                viz.render();
+                body: JSON.stringify({
+                    statements: [{
+                        statement: 'RETURN 1 as test',
+                        resultDataContents: ['row']
+                    }]
+                })
             });
 
-            // Clean up
-            document.body.removeChild(testContainer);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
 
-            this.updateConnectionStatus('neo4jTestStatus', `✅ Connected successfully to database: ${database}`, 'success');
+            const data = await response.json();
+
+            // Check for Neo4j errors
+            if (data.errors && data.errors.length > 0) {
+                const error = data.errors[0];
+                throw new Error(`${error.message} (${error.code})`);
+            }
+
+            // Verify result
+            if (data.results && data.results[0] && data.results[0].data && data.results[0].data.length > 0) {
+                this.updateConnectionStatus('neo4jTestStatus', `✅ Connected successfully! Database: ${database}`, 'success');
+            } else {
+                this.updateConnectionStatus('neo4jTestStatus', 'Connection established but unexpected response', 'error');
+            }
 
         } catch (error) {
             console.error('Neo4j connection error:', error);
-
-            // Clean up on error
-            const testContainer = document.getElementById('neo4j-test-container');
-            if (testContainer) {
-                document.body.removeChild(testContainer);
-            }
-
             this.updateConnectionStatus('neo4jTestStatus', `Connection error: ${error.message}`, 'error');
         }
     }
@@ -980,32 +941,29 @@ class NOXApp {
         }
 
         try {
-            this.updateGraphStatus('Executing query...', 'loading');
+            this.updateGraphStatus('Executing query via HTTP API...', 'loading');
 
             // Initialize or update visualization
-            if (!neo4jManager.viz) {
-                const viz = await neo4jManager.initializeVisualization('graphCanvas', query, database);
+            if (!neo4jManager.network) {
+                const result = await neo4jManager.initializeVisualization('graphCanvas', query);
 
-                // Add event listeners for better feedback
-                viz.registerOnEvent('completed', () => {
-                    const network = viz._network;
-                    const nodeCount = network ? network.body.data.nodes.length : 0;
-                    const edgeCount = network ? network.body.data.edges.length : 0;
-
-                    if (nodeCount === 0) {
-                        this.updateGraphStatus(`Query completed but no nodes found. Try: MATCH (n) RETURN n LIMIT 10`, 'error');
-                    } else {
-                        this.updateGraphStatus(`✅ Graph rendered: ${nodeCount} node(s), ${edgeCount} relationship(s) | Database: ${database}`, 'success');
-                    }
-                });
-
-                viz.registerOnEvent('error', (error) => {
-                    this.updateGraphStatus(`Rendering error: ${error.error_msg || error.message || 'Unknown error'}`, 'error');
-                });
-
+                if (result.nodeCount === 0) {
+                    this.updateGraphStatus(`Query executed but no nodes found. Try: MATCH (n) RETURN n LIMIT 10`, 'error');
+                } else {
+                    this.updateGraphStatus(`✅ Graph rendered: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s)`, 'success');
+                    // Fit graph to view after short delay
+                    setTimeout(() => neo4jManager.fit(), 500);
+                }
             } else {
-                await neo4jManager.executeQuery(query, database);
-                this.updateGraphStatus(`Query executed. Check graph above. | Database: ${database}`, 'success');
+                const result = await neo4jManager.updateVisualization(query);
+
+                if (result.nodeCount === 0) {
+                    this.updateGraphStatus(`Query executed but no nodes found. Try a different query.`, 'error');
+                } else {
+                    this.updateGraphStatus(`✅ Graph updated: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s)`, 'success');
+                    // Fit graph to view after short delay
+                    setTimeout(() => neo4jManager.fit(), 500);
+                }
             }
         } catch (error) {
             console.error('Graph query error:', error);
@@ -1027,14 +985,14 @@ class NOXApp {
     }
 
     clearGraph() {
-        if (neo4jManager.viz) {
+        if (neo4jManager.network) {
             neo4jManager.clearVisualization();
             this.updateGraphStatus('Graph cleared. Ready for new query.');
         }
     }
 
     stabilizeGraph() {
-        if (neo4jManager.viz) {
+        if (neo4jManager.network) {
             neo4jManager.stabilize();
             this.updateGraphStatus('Stabilizing graph layout...', 'loading');
             setTimeout(() => {
