@@ -286,8 +286,33 @@ class NOXApp {
                 <span class="execution-status-text">${status === 'running' ? 'Running' : status === 'failed' ? 'Failed' : 'Success'}</span>
                 <span class="execution-time">${timeAgo}</span>
             </div>
+            ${status === 'failed' ? `
+                <button class="fix-error-btn" data-execution-id="${execution.id}" title="Ask NOX to help fix this error">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                    Fix Error
+                </button>
+            ` : ''}
         `;
-        header.addEventListener('click', () => this.toggleExecutionGroup(execution.id));
+
+        // Add click handler for expand/collapse (but not on the fix button)
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.fix-error-btn')) {
+                this.toggleExecutionGroup(execution.id);
+            }
+        });
+
+        // Add fix error button handler if present
+        if (status === 'failed') {
+            const fixBtn = header.querySelector('.fix-error-btn');
+            if (fixBtn) {
+                fixBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.sendErrorToChat(execution);
+                });
+            }
+        }
 
         // Nodes list
         const nodesList = document.createElement('div');
@@ -1172,6 +1197,78 @@ class NOXApp {
                 }
             });
         });
+    }
+
+    /**
+     * Send workflow error to chat for AI assistance
+     */
+    async sendErrorToChat(execution) {
+        try {
+            // Extract error details from execution
+            const errorDetails = this.extractErrorDetails(execution);
+
+            // Build error message for the AI
+            let errorMessage = `🔧 **Workflow Execution Failed - Please Help Fix**\n\n`;
+            errorMessage += `**Execution ID:** #${execution.id}\n`;
+            errorMessage += `**Workflow ID:** ${execution.workflowId}\n`;
+            errorMessage += `**Started:** ${new Date(execution.startedAt).toLocaleString()}\n\n`;
+
+            if (errorDetails.mainError) {
+                errorMessage += `**Main Error:**\n\`\`\`\n${errorDetails.mainError}\n\`\`\`\n\n`;
+            }
+
+            if (errorDetails.nodeErrors && errorDetails.nodeErrors.length > 0) {
+                errorMessage += `**Node Errors:**\n`;
+                errorDetails.nodeErrors.forEach(nodeError => {
+                    errorMessage += `\n**${nodeError.nodeName}:**\n`;
+                    errorMessage += `\`\`\`\n${nodeError.error}\n\`\`\`\n`;
+                });
+            }
+
+            errorMessage += `\nPlease analyze this error and suggest how to fix it.`;
+
+            // Set the input and send
+            this.chatInput.value = errorMessage;
+            await this.sendMessage();
+
+        } catch (error) {
+            console.error('Failed to send error to chat:', error);
+            this.displayMessage({
+                role: 'system',
+                content: '❌ Failed to send error to chat. Please try again.'
+            });
+        }
+    }
+
+    /**
+     * Extract error details from execution object
+     */
+    extractErrorDetails(execution) {
+        const details = {
+            mainError: null,
+            nodeErrors: []
+        };
+
+        // Main error from resultData
+        if (execution.data?.resultData?.error) {
+            const error = execution.data.resultData.error;
+            details.mainError = typeof error === 'string' ? error : JSON.stringify(error, null, 2);
+        }
+
+        // Node-specific errors
+        if (execution.data?.resultData?.runData) {
+            Object.entries(execution.data.resultData.runData).forEach(([nodeName, nodeData]) => {
+                if (nodeData && nodeData[0]?.error) {
+                    const error = nodeData[0].error;
+                    details.nodeErrors.push({
+                        nodeName,
+                        error: error.message || JSON.stringify(error, null, 2)
+                    });
+                }
+            });
+        }
+
+        return details;
     }
 
     /**
