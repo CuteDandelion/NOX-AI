@@ -27,6 +27,10 @@ class NOXApp {
         this.selectedExecutionId = null;
         this.executionsRefreshInterval = null;
 
+        // Graph auto-refresh
+        this.graphPollingInterval = null;
+        this.graphAutoRefreshEnabled = false;
+
         this.init();
     }
 
@@ -108,6 +112,7 @@ class NOXApp {
         document.getElementById('refreshGraph').addEventListener('click', () => this.refreshGraph());
         document.getElementById('clearGraph').addEventListener('click', () => this.clearGraph());
         document.getElementById('stabilizeGraph').addEventListener('click', () => this.stabilizeGraph());
+        document.getElementById('toggleAutoRefresh').addEventListener('click', () => this.toggleGraphAutoRefresh());
 
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
@@ -960,6 +965,16 @@ class NOXApp {
     closeGraphView() {
         document.getElementById('graphViewModal').classList.add('hidden');
 
+        // Stop auto-refresh if enabled
+        if (this.graphAutoRefreshEnabled) {
+            this.stopGraphPolling();
+            this.graphAutoRefreshEnabled = false;
+            const button = document.getElementById('toggleAutoRefresh');
+            if (button) {
+                button.classList.remove('active');
+            }
+        }
+
         // Clear the graph
         if (neo4jManager.viz) {
             neo4jManager.clearVisualization();
@@ -1039,6 +1054,66 @@ class NOXApp {
             }, 2000);
         } else {
             this.updateGraphStatus('No graph to stabilize. Execute a query first.', 'error');
+        }
+    }
+
+    /**
+     * Toggle graph auto-refresh polling
+     */
+    toggleGraphAutoRefresh() {
+        const button = document.getElementById('toggleAutoRefresh');
+
+        if (this.graphAutoRefreshEnabled) {
+            // Stop auto-refresh
+            this.stopGraphPolling();
+            button.classList.remove('active');
+            this.graphAutoRefreshEnabled = false;
+            this.updateGraphStatus('Auto-refresh disabled', 'success');
+        } else {
+            // Start auto-refresh
+            const query = document.getElementById('cypherQuery').value.trim();
+            if (!query) {
+                this.updateGraphStatus('Please execute a query first before enabling auto-refresh', 'error');
+                return;
+            }
+
+            this.startGraphPolling();
+            button.classList.add('active');
+            this.graphAutoRefreshEnabled = true;
+            this.updateGraphStatus('🔄 Auto-refresh enabled (5s interval)', 'success');
+        }
+    }
+
+    /**
+     * Start graph polling with 5 second interval
+     */
+    startGraphPolling() {
+        // Clear any existing interval
+        this.stopGraphPolling();
+
+        // Start new polling interval (5 seconds)
+        this.graphPollingInterval = setInterval(async () => {
+            try {
+                const query = document.getElementById('cypherQuery').value.trim();
+                if (query && neo4jManager.network) {
+                    // Update silently without changing status
+                    await neo4jManager.updateVisualization(query);
+                    console.log('Graph auto-refreshed');
+                }
+            } catch (error) {
+                console.error('Auto-refresh failed:', error);
+                // Don't stop polling on single error
+            }
+        }, 5000);
+    }
+
+    /**
+     * Stop graph polling
+     */
+    stopGraphPolling() {
+        if (this.graphPollingInterval) {
+            clearInterval(this.graphPollingInterval);
+            this.graphPollingInterval = null;
         }
     }
 

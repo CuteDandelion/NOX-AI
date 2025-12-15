@@ -1660,6 +1660,26 @@ body {
     height: 14px;
 }
 
+/* Auto-refresh button active state */
+#toggleAutoRefresh.active {
+    background: var(--node-success);
+    border-color: var(--node-success);
+    color: white;
+}
+
+#toggleAutoRefresh.active svg {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .graph-canvas {
     flex: 1;
     background: var(--bg-primary);
