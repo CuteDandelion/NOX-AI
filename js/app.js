@@ -985,7 +985,7 @@ class NOXApp {
                 if (result.nodeCount === 0) {
                     this.updateGraphStatus(`Query executed but no nodes found. Try: MATCH (n) RETURN n LIMIT 10`, 'error');
                 } else {
-                    this.updateGraphStatus(`✅ Graph rendered: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s)`, 'success');
+                    this.updateGraphStatus(`✅ Graph rendered: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s) • Double-click nodes to expand`, 'success');
                     // Fit graph to view after short delay
                     setTimeout(() => neo4jManager.fit(), 500);
                 }
@@ -1021,8 +1021,12 @@ class NOXApp {
 
     clearGraph() {
         if (neo4jManager.network) {
-            neo4jManager.clearVisualization();
-            this.updateGraphStatus('Graph cleared. Ready for new query.');
+            const result = neo4jManager.collapseAll();
+            if (result) {
+                this.updateGraphStatus(`✅ Collapsed to original query: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s)`, 'success');
+            } else {
+                this.updateGraphStatus('No expanded nodes to collapse.', 'success');
+            }
         }
     }
 
