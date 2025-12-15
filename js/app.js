@@ -62,6 +62,7 @@ class NOXApp {
         this.setupN8NMonitoring();
         this.setupWorkflowMonitoring();
         this.setupTextareaAutoResize();
+        this.restoreSidebarStates();
         this.renderChatList();
         this.loadCurrentChat();
     }
@@ -132,7 +133,15 @@ class NOXApp {
             }
         });
 
-        // Execution panel toggle (removed - now permanent panel)
+        // Sidebar toggles
+        document.getElementById('sidebarToggle').addEventListener('click', () => this.toggleSidebar());
+        document.getElementById('executionPanelToggle').addEventListener('click', () => this.toggleExecutionPanel());
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
     }
 
     setupTextareaAutoResize() {
@@ -626,9 +635,10 @@ class NOXApp {
             this.removeMessage(loadingId);
             const errorMessage = {
                 role: 'system',
-                content: `Error: ${error.message}`
+                content: `❌ ${this.formatError(error)}`
             };
             this.displayMessage(errorMessage);
+            console.error('Send message error:', error);
         } finally {
             this.isProcessing = false;
             this.sendButton.disabled = false;
@@ -722,7 +732,7 @@ class NOXApp {
         messageEl.id = loadingId;
 
         messageEl.innerHTML = `
-            <div class="message-avatar">🤖</div>
+            <div class="message-avatar">${this.getAvatarHTML('assistant')}</div>
             <div class="message-content">
                 <div class="message-role">NOX.AI</div>
                 <div class="loading-indicator">
@@ -1014,6 +1024,46 @@ class NOXApp {
 
     // ==================== Utilities ====================
 
+    /**
+     * Format error messages for user display
+     */
+    formatError(error) {
+        // Handle different error types
+        if (!error) {
+            return 'An unexpected error occurred. Please try again.';
+        }
+
+        // If it's a string, return it
+        if (typeof error === 'string') {
+            return error;
+        }
+
+        // Try to extract meaningful message
+        if (error.message && error.message !== 'null' && error.message !== 'undefined') {
+            return error.message;
+        }
+
+        if (error.error) {
+            return typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
+        }
+
+        if (error.statusText) {
+            return `${error.status || 'Error'}: ${error.statusText}`;
+        }
+
+        // Last resort - stringify but make it readable
+        try {
+            const str = JSON.stringify(error);
+            if (str !== '{}' && str !== 'null') {
+                return `Error: ${str}`;
+            }
+        } catch (e) {
+            // Can't stringify
+        }
+
+        return 'An unexpected error occurred. Please check the console for details.';
+    }
+
     getAvatarHTML(role) {
         if (role === 'user') {
             return '👤';
@@ -1122,6 +1172,65 @@ class NOXApp {
                 }
             });
         });
+    }
+
+    /**
+     * Toggle left sidebar (chat list)
+     */
+    toggleSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        sidebar.classList.toggle('collapsed');
+
+        // Save state to localStorage
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebar-collapsed', isCollapsed);
+    }
+
+    /**
+     * Toggle right execution panel
+     */
+    toggleExecutionPanel() {
+        const panel = document.getElementById('executionPanel');
+        panel.classList.toggle('collapsed');
+
+        // Save state to localStorage
+        const isCollapsed = panel.classList.contains('collapsed');
+        localStorage.setItem('execution-panel-collapsed', isCollapsed);
+    }
+
+    /**
+     * Restore sidebar states from localStorage
+     */
+    restoreSidebarStates() {
+        // Restore left sidebar state
+        const sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+        if (sidebarCollapsed) {
+            document.querySelector('.sidebar').classList.add('collapsed');
+        }
+
+        // Restore right panel state
+        const panelCollapsed = localStorage.getItem('execution-panel-collapsed') === 'true';
+        if (panelCollapsed) {
+            document.getElementById('executionPanel').classList.add('collapsed');
+        }
+    }
+
+    /**
+     * Toggle theme (dark/light)
+     */
+    toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+        html.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        // Update theme toggle icon
+        const themeIcon = document.querySelector('.theme-icon');
+        if (themeIcon) {
+            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
     }
 }
 
