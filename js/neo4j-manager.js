@@ -15,6 +15,8 @@ class Neo4jManager {
         this.network = null;
         this.nodes = null;
         this.edges = null;
+        this.expandedNodes = new Set(); // Track expanded nodes
+        this.originalNodeIds = new Set(); // Track nodes from original query
 
         // Load config asynchronously
         this.init();
@@ -246,6 +248,10 @@ class Neo4jManager {
 
         this.network = new vis.Network(container, data, options);
 
+        // Store original node IDs
+        this.originalNodeIds.clear();
+        graphData.nodes.forEach(node => this.originalNodeIds.add(node.id));
+
         // Add event listeners for interactivity
         this.network.on('click', (params) => {
             if (params.nodes.length > 0) {
@@ -255,9 +261,108 @@ class Neo4jManager {
             }
         });
 
+        // Add double-click handler for node expansion
+        this.network.on('doubleClick', (params) => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                this.expandNode(nodeId);
+            }
+        });
+
         return {
             nodeCount: graphData.nodes.length,
             edgeCount: graphData.edges.length
+        };
+    }
+
+    /**
+     * Expand a node to show its 1-hop neighbors
+     */
+    async expandNode(nodeId) {
+        try {
+            console.log('Expanding node:', nodeId);
+
+            // Query for 1-hop neighbors
+            const query = `MATCH (n)-[r]-(m) WHERE id(n) = ${nodeId} RETURN n, r, m`;
+            const result = await this.executeQuery(query);
+            const graphData = this.parseGraphData(result);
+
+            // Mark the expanded node
+            const expandedNode = this.nodes.get(nodeId);
+            if (expandedNode) {
+                expandedNode.expanded = true;
+                expandedNode.borderWidth = 4;
+                this.nodes.update(expandedNode);
+                this.expandedNodes.add(nodeId);
+            }
+
+            // Add new nodes (avoiding duplicates)
+            let newNodesCount = 0;
+            graphData.nodes.forEach(node => {
+                if (!this.nodes.get(node.id)) {
+                    this.nodes.add(node);
+                    newNodesCount++;
+                }
+            });
+
+            // Add new edges (avoiding duplicates)
+            let newEdgesCount = 0;
+            graphData.edges.forEach(edge => {
+                if (!this.edges.get(edge.id)) {
+                    this.edges.add(edge);
+                    newEdgesCount++;
+                }
+            });
+
+            // Stabilize the layout
+            this.network.stabilize();
+
+            return {
+                nodeCount: newNodesCount,
+                edgeCount: newEdgesCount,
+                totalNodes: this.nodes.length,
+                totalEdges: this.edges.length
+            };
+        } catch (error) {
+            console.error('Failed to expand node:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Collapse all expanded nodes back to original query
+     */
+    collapseAll() {
+        if (!this.nodes || !this.edges) return;
+
+        // Remove all nodes that weren't in the original query
+        const nodesToRemove = this.nodes.get().filter(node => !this.originalNodeIds.has(node.id));
+        this.nodes.remove(nodesToRemove.map(n => n.id));
+
+        // Remove orphaned edges
+        const currentNodeIds = new Set(this.nodes.getIds());
+        const edgesToRemove = this.edges.get().filter(edge =>
+            !currentNodeIds.has(edge.from) || !currentNodeIds.has(edge.to)
+        );
+        this.edges.remove(edgesToRemove.map(e => e.id));
+
+        // Reset expanded nodes visual state
+        this.expandedNodes.forEach(nodeId => {
+            const node = this.nodes.get(nodeId);
+            if (node) {
+                node.expanded = false;
+                node.borderWidth = 2;
+                this.nodes.update(node);
+            }
+        });
+        this.expandedNodes.clear();
+
+        // Re-fit the view
+        this.fit();
+
+        return {
+            nodeCount: this.nodes.length,
+            edgeCount: this.edges.length
         };
     }
 

@@ -27,6 +27,10 @@ class NOXApp {
         this.selectedExecutionId = null;
         this.executionsRefreshInterval = null;
 
+        // Graph auto-refresh
+        this.graphPollingInterval = null;
+        this.graphAutoRefreshEnabled = false;
+
         this.init();
     }
 
@@ -62,6 +66,7 @@ class NOXApp {
         this.setupN8NMonitoring();
         this.setupWorkflowMonitoring();
         this.setupTextareaAutoResize();
+        this.restoreSidebarStates();
         this.renderChatList();
         this.loadCurrentChat();
     }
@@ -107,6 +112,7 @@ class NOXApp {
         document.getElementById('refreshGraph').addEventListener('click', () => this.refreshGraph());
         document.getElementById('clearGraph').addEventListener('click', () => this.clearGraph());
         document.getElementById('stabilizeGraph').addEventListener('click', () => this.stabilizeGraph());
+        document.getElementById('toggleAutoRefresh').addEventListener('click', () => this.toggleGraphAutoRefresh());
 
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
@@ -132,7 +138,15 @@ class NOXApp {
             }
         });
 
-        // Execution panel toggle (removed - now permanent panel)
+        // Sidebar toggles
+        document.getElementById('sidebarToggle').addEventListener('click', () => this.toggleSidebar());
+        document.getElementById('executionPanelToggle').addEventListener('click', () => this.toggleExecutionPanel());
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => this.toggleTheme());
+        }
     }
 
     setupTextareaAutoResize() {
@@ -277,8 +291,33 @@ class NOXApp {
                 <span class="execution-status-text">${status === 'running' ? 'Running' : status === 'failed' ? 'Failed' : 'Success'}</span>
                 <span class="execution-time">${timeAgo}</span>
             </div>
+            ${status === 'failed' ? `
+                <button class="fix-error-btn" data-execution-id="${execution.id}" title="Ask NOX to help fix this error">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                    Fix Error
+                </button>
+            ` : ''}
         `;
-        header.addEventListener('click', () => this.toggleExecutionGroup(execution.id));
+
+        // Add click handler for expand/collapse (but not on the fix button)
+        header.addEventListener('click', (e) => {
+            if (!e.target.closest('.fix-error-btn')) {
+                this.toggleExecutionGroup(execution.id);
+            }
+        });
+
+        // Add fix error button handler if present
+        if (status === 'failed') {
+            const fixBtn = header.querySelector('.fix-error-btn');
+            if (fixBtn) {
+                fixBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.sendErrorToChat(execution);
+                });
+            }
+        }
 
         // Nodes list
         const nodesList = document.createElement('div');
@@ -626,9 +665,10 @@ class NOXApp {
             this.removeMessage(loadingId);
             const errorMessage = {
                 role: 'system',
-                content: `Error: ${error.message}`
+                content: `❌ ${this.formatError(error)}`
             };
             this.displayMessage(errorMessage);
+            console.error('Send message error:', error);
         } finally {
             this.isProcessing = false;
             this.sendButton.disabled = false;
@@ -722,7 +762,7 @@ class NOXApp {
         messageEl.id = loadingId;
 
         messageEl.innerHTML = `
-            <div class="message-avatar">🤖</div>
+            <div class="message-avatar">${this.getAvatarHTML('assistant')}</div>
             <div class="message-content">
                 <div class="message-role">NOX.AI</div>
                 <div class="loading-indicator">
@@ -925,6 +965,16 @@ class NOXApp {
     closeGraphView() {
         document.getElementById('graphViewModal').classList.add('hidden');
 
+        // Stop auto-refresh if enabled
+        if (this.graphAutoRefreshEnabled) {
+            this.stopGraphPolling();
+            this.graphAutoRefreshEnabled = false;
+            const button = document.getElementById('toggleAutoRefresh');
+            if (button) {
+                button.classList.remove('active');
+            }
+        }
+
         // Clear the graph
         if (neo4jManager.viz) {
             neo4jManager.clearVisualization();
@@ -950,7 +1000,7 @@ class NOXApp {
                 if (result.nodeCount === 0) {
                     this.updateGraphStatus(`Query executed but no nodes found. Try: MATCH (n) RETURN n LIMIT 10`, 'error');
                 } else {
-                    this.updateGraphStatus(`✅ Graph rendered: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s)`, 'success');
+                    this.updateGraphStatus(`✅ Graph rendered: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s) • Double-click nodes to expand`, 'success');
                     // Fit graph to view after short delay
                     setTimeout(() => neo4jManager.fit(), 500);
                 }
@@ -986,8 +1036,12 @@ class NOXApp {
 
     clearGraph() {
         if (neo4jManager.network) {
-            neo4jManager.clearVisualization();
-            this.updateGraphStatus('Graph cleared. Ready for new query.');
+            const result = neo4jManager.collapseAll();
+            if (result) {
+                this.updateGraphStatus(`✅ Collapsed to original query: ${result.nodeCount} node(s), ${result.edgeCount} relationship(s)`, 'success');
+            } else {
+                this.updateGraphStatus('No expanded nodes to collapse.', 'success');
+            }
         }
     }
 
@@ -1003,6 +1057,66 @@ class NOXApp {
         }
     }
 
+    /**
+     * Toggle graph auto-refresh polling
+     */
+    toggleGraphAutoRefresh() {
+        const button = document.getElementById('toggleAutoRefresh');
+
+        if (this.graphAutoRefreshEnabled) {
+            // Stop auto-refresh
+            this.stopGraphPolling();
+            button.classList.remove('active');
+            this.graphAutoRefreshEnabled = false;
+            this.updateGraphStatus('Auto-refresh disabled', 'success');
+        } else {
+            // Start auto-refresh
+            const query = document.getElementById('cypherQuery').value.trim();
+            if (!query) {
+                this.updateGraphStatus('Please execute a query first before enabling auto-refresh', 'error');
+                return;
+            }
+
+            this.startGraphPolling();
+            button.classList.add('active');
+            this.graphAutoRefreshEnabled = true;
+            this.updateGraphStatus('🔄 Auto-refresh enabled (5s interval)', 'success');
+        }
+    }
+
+    /**
+     * Start graph polling with 5 second interval
+     */
+    startGraphPolling() {
+        // Clear any existing interval
+        this.stopGraphPolling();
+
+        // Start new polling interval (5 seconds)
+        this.graphPollingInterval = setInterval(async () => {
+            try {
+                const query = document.getElementById('cypherQuery').value.trim();
+                if (query && neo4jManager.network) {
+                    // Update silently without changing status
+                    await neo4jManager.updateVisualization(query);
+                    console.log('Graph auto-refreshed');
+                }
+            } catch (error) {
+                console.error('Auto-refresh failed:', error);
+                // Don't stop polling on single error
+            }
+        }, 5000);
+    }
+
+    /**
+     * Stop graph polling
+     */
+    stopGraphPolling() {
+        if (this.graphPollingInterval) {
+            clearInterval(this.graphPollingInterval);
+            this.graphPollingInterval = null;
+        }
+    }
+
     updateGraphStatus(message, type = '') {
         const statusEl = document.getElementById('graphStatus');
         statusEl.textContent = message;
@@ -1013,6 +1127,46 @@ class NOXApp {
     }
 
     // ==================== Utilities ====================
+
+    /**
+     * Format error messages for user display
+     */
+    formatError(error) {
+        // Handle different error types
+        if (!error) {
+            return 'An unexpected error occurred. Please try again.';
+        }
+
+        // If it's a string, return it
+        if (typeof error === 'string') {
+            return error;
+        }
+
+        // Try to extract meaningful message
+        if (error.message && error.message !== 'null' && error.message !== 'undefined') {
+            return error.message;
+        }
+
+        if (error.error) {
+            return typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
+        }
+
+        if (error.statusText) {
+            return `${error.status || 'Error'}: ${error.statusText}`;
+        }
+
+        // Last resort - stringify but make it readable
+        try {
+            const str = JSON.stringify(error);
+            if (str !== '{}' && str !== 'null') {
+                return `Error: ${str}`;
+            }
+        } catch (e) {
+            // Can't stringify
+        }
+
+        return 'An unexpected error occurred. Please check the console for details.';
+    }
 
     getAvatarHTML(role) {
         if (role === 'user') {
@@ -1122,6 +1276,137 @@ class NOXApp {
                 }
             });
         });
+    }
+
+    /**
+     * Send workflow error to chat for AI assistance
+     */
+    async sendErrorToChat(execution) {
+        try {
+            // Extract error details from execution
+            const errorDetails = this.extractErrorDetails(execution);
+
+            // Build error message for the AI
+            let errorMessage = `🔧 **Workflow Execution Failed - Please Help Fix**\n\n`;
+            errorMessage += `**Execution ID:** #${execution.id}\n`;
+            errorMessage += `**Workflow ID:** ${execution.workflowId}\n`;
+            errorMessage += `**Started:** ${new Date(execution.startedAt).toLocaleString()}\n\n`;
+
+            if (errorDetails.mainError) {
+                errorMessage += `**Main Error:**\n\`\`\`\n${errorDetails.mainError}\n\`\`\`\n\n`;
+            }
+
+            if (errorDetails.nodeErrors && errorDetails.nodeErrors.length > 0) {
+                errorMessage += `**Node Errors:**\n`;
+                errorDetails.nodeErrors.forEach(nodeError => {
+                    errorMessage += `\n**${nodeError.nodeName}:**\n`;
+                    errorMessage += `\`\`\`\n${nodeError.error}\n\`\`\`\n`;
+                });
+            }
+
+            errorMessage += `\nPlease analyze this error and suggest how to fix it.`;
+
+            // Set the input and send
+            this.chatInput.value = errorMessage;
+            await this.sendMessage();
+
+        } catch (error) {
+            console.error('Failed to send error to chat:', error);
+            this.displayMessage({
+                role: 'system',
+                content: '❌ Failed to send error to chat. Please try again.'
+            });
+        }
+    }
+
+    /**
+     * Extract error details from execution object
+     */
+    extractErrorDetails(execution) {
+        const details = {
+            mainError: null,
+            nodeErrors: []
+        };
+
+        // Main error from resultData
+        if (execution.data?.resultData?.error) {
+            const error = execution.data.resultData.error;
+            details.mainError = typeof error === 'string' ? error : JSON.stringify(error, null, 2);
+        }
+
+        // Node-specific errors
+        if (execution.data?.resultData?.runData) {
+            Object.entries(execution.data.resultData.runData).forEach(([nodeName, nodeData]) => {
+                if (nodeData && nodeData[0]?.error) {
+                    const error = nodeData[0].error;
+                    details.nodeErrors.push({
+                        nodeName,
+                        error: error.message || JSON.stringify(error, null, 2)
+                    });
+                }
+            });
+        }
+
+        return details;
+    }
+
+    /**
+     * Toggle left sidebar (chat list)
+     */
+    toggleSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        sidebar.classList.toggle('collapsed');
+
+        // Save state to localStorage
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebar-collapsed', isCollapsed);
+    }
+
+    /**
+     * Toggle right execution panel
+     */
+    toggleExecutionPanel() {
+        const panel = document.getElementById('executionPanel');
+        panel.classList.toggle('collapsed');
+
+        // Save state to localStorage
+        const isCollapsed = panel.classList.contains('collapsed');
+        localStorage.setItem('execution-panel-collapsed', isCollapsed);
+    }
+
+    /**
+     * Restore sidebar states from localStorage
+     */
+    restoreSidebarStates() {
+        // Restore left sidebar state
+        const sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+        if (sidebarCollapsed) {
+            document.querySelector('.sidebar').classList.add('collapsed');
+        }
+
+        // Restore right panel state
+        const panelCollapsed = localStorage.getItem('execution-panel-collapsed') === 'true';
+        if (panelCollapsed) {
+            document.getElementById('executionPanel').classList.add('collapsed');
+        }
+    }
+
+    /**
+     * Toggle theme (dark/light)
+     */
+    toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+        html.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+
+        // Update theme toggle icon
+        const themeIcon = document.querySelector('.theme-icon');
+        if (themeIcon) {
+            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
     }
 }
 
