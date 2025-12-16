@@ -1235,7 +1235,8 @@ class NOXApp {
             const isLongCode = lineCount > 15;
             const collapsedClass = isLongCode ? 'collapsed' : '';
 
-            const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
+            // Use HTML comment as placeholder so marked.js won't wrap it in <p> tags
+            const placeholder = `<!--CODE_BLOCK_${codeBlocks.length}-->`;
             codeBlocks.push(`
                 <div class="code-block-wrapper ${collapsedClass}" id="${wrapperId}">
                     <div class="code-block-header" onclick="document.getElementById('${wrapperId}').classList.toggle('collapsed')">
@@ -1291,7 +1292,7 @@ class NOXApp {
 
         // Step 3: Restore code blocks with syntax highlighting
         codeBlocks.forEach((block, i) => {
-            formatted = formatted.replace(`___CODE_BLOCK_${i}___`, block);
+            formatted = formatted.replace(`<!--CODE_BLOCK_${i}-->`, block);
         });
 
         return formatted;
