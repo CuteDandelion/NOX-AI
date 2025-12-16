@@ -1221,9 +1221,9 @@ class NOXApp {
     formatMessageContent(content) {
         let formatted = content;
         const codeBlocks = [];
-        const inlineCodeBlocks = [];
 
         // Step 1: Extract and replace code blocks with placeholders
+        // (We need to do this before marked.js parses the content)
         formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
             const language = lang || 'plaintext';
             const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1262,27 +1262,36 @@ class NOXApp {
             return placeholder;
         });
 
-        // Step 2: Extract and replace inline code with placeholders
-        formatted = formatted.replace(/`([^`]+)`/g, (match, code) => {
-            const placeholder = `___INLINE_CODE_${inlineCodeBlocks.length}___`;
-            inlineCodeBlocks.push(`<code class="inline-code">${this.escapeHtml(code)}</code>`);
-            return placeholder;
-        });
+        // Step 2: Use marked.js to parse the remaining markdown
+        // This handles: tables, headers, bold, italic, lists, links, horizontal rules, etc.
+        if (window.marked) {
+            // Configure marked.js options
+            marked.setOptions({
+                breaks: true,        // Convert \n to <br>
+                gfm: true,          // GitHub Flavored Markdown (includes tables)
+                headerIds: false,   // Don't generate header IDs
+                mangle: false,      // Don't mangle email addresses
+                sanitize: false     // Don't sanitize HTML (we trust the content)
+            });
 
-        // Step 3: Escape the remaining plain text content
-        formatted = this.escapeHtml(formatted);
+            try {
+                formatted = marked.parse(formatted);
+            } catch (error) {
+                console.error('Marked.js parsing error:', error);
+                // Fallback: just escape HTML and convert newlines
+                formatted = this.escapeHtml(formatted);
+                formatted = formatted.replace(/\n/g, '<br>');
+            }
+        } else {
+            // Fallback if marked.js is not loaded
+            console.warn('Marked.js not loaded, using basic formatting');
+            formatted = this.escapeHtml(formatted);
+            formatted = formatted.replace(/\n/g, '<br>');
+        }
 
-        // Step 4: Convert newlines to <br> in plain text
-        formatted = formatted.replace(/\n/g, '<br>');
-
-        // Step 5: Restore code blocks (they already have escaped content)
+        // Step 3: Restore code blocks with syntax highlighting
         codeBlocks.forEach((block, i) => {
             formatted = formatted.replace(`___CODE_BLOCK_${i}___`, block);
-        });
-
-        // Step 6: Restore inline code blocks
-        inlineCodeBlocks.forEach((block, i) => {
-            formatted = formatted.replace(`___INLINE_CODE_${i}___`, block);
         });
 
         return formatted;
