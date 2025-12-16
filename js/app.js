@@ -141,12 +141,6 @@ class NOXApp {
         // Sidebar toggles
         document.getElementById('sidebarToggle').addEventListener('click', () => this.toggleSidebar());
         document.getElementById('executionPanelToggle').addEventListener('click', () => this.toggleExecutionPanel());
-
-        // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => this.toggleTheme());
-        }
     }
 
     setupTextareaAutoResize() {
@@ -719,8 +713,21 @@ class NOXApp {
             messageEl.innerHTML = `
                 <div class="message-content">
                     ${this.escapeHtml(message.content)}
+                    <button class="message-dismiss" aria-label="Dismiss message">×</button>
                 </div>
             `;
+
+            // Add dismiss handler
+            setTimeout(() => {
+                const dismissBtn = messageEl.querySelector('.message-dismiss');
+                if (dismissBtn) {
+                    dismissBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        messageEl.classList.add('dismissing');
+                        setTimeout(() => messageEl.remove(), 300);
+                    });
+                }
+            }, 100);
         } else {
             const avatar = this.getAvatarHTML(message.role);
             const role = message.role === 'user' ? 'You' : 'NOX.AI';
@@ -1212,10 +1219,38 @@ class NOXApp {
         formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
             const language = lang || 'plaintext';
             const codeId = `code-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const wrapperId = `wrapper-${codeId}`;
             const escapedCode = this.escapeHtml(code.trim());
 
+            // Count lines
+            const lineCount = escapedCode.split('\n').length;
+            const isLongCode = lineCount > 15;
+            const collapsedClass = isLongCode ? 'collapsed' : '';
+
             const placeholder = `___CODE_BLOCK_${codeBlocks.length}___`;
-            codeBlocks.push(`<div class="code-block-wrapper"><div class="code-block-header"><span class="code-block-lang">${language}</span><button class="code-copy-btn" data-code-id="${codeId}" title="Copy code"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"></path></svg>Copy</button></div><pre class="code-block" id="${codeId}"><code class="language-${language}">${escapedCode}</code></pre></div>`);
+            codeBlocks.push(`
+                <div class="code-block-wrapper ${collapsedClass}" id="${wrapperId}">
+                    <div class="code-block-header" onclick="document.getElementById('${wrapperId}').classList.toggle('collapsed')">
+                        <div class="code-block-header-left">
+                            <svg class="code-block-collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                            <div class="code-block-info">
+                                <span class="code-block-lang">${language}</span>
+                                <span class="code-block-lines">${lineCount} lines</span>
+                            </div>
+                        </div>
+                        <button class="code-copy-btn" data-code-id="${codeId}" title="Copy code" onclick="event.stopPropagation()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                    <pre class="code-block" id="${codeId}"><code class="language-${language}">${escapedCode}</code></pre>
+                </div>
+            `);
             return placeholder;
         });
 
@@ -1391,23 +1426,6 @@ class NOXApp {
         }
     }
 
-    /**
-     * Toggle theme (dark/light)
-     */
-    toggleTheme() {
-        const html = document.documentElement;
-        const currentTheme = html.getAttribute('data-theme') || 'dark';
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-        html.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-
-        // Update theme toggle icon
-        const themeIcon = document.querySelector('.theme-icon');
-        if (themeIcon) {
-            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
-        }
-    }
 }
 
 // Initialize application
