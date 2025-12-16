@@ -889,6 +889,14 @@ class NOXApp {
             return;
         }
 
+        // Check for Mixed Content issues (HTTP resource from HTTPS page)
+        if (window.location.protocol === 'https:' && neo4jUrl.startsWith('http:')) {
+            this.updateConnectionStatus('neo4jTestStatus',
+                '⚠️ Mixed Content Error: Cannot load HTTP resource from HTTPS page. Change URL to use HTTPS.',
+                'error');
+            return;
+        }
+
         this.updateConnectionStatus('neo4jTestStatus', 'Testing Neo4j connection via HTTP API...', 'testing');
 
         try {
