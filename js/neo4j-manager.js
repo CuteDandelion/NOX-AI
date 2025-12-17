@@ -18,6 +18,26 @@ class Neo4jManager {
         this.expandedNodes = new Set(); // Track expanded nodes
         this.originalNodeIds = new Set(); // Track nodes from original query
 
+        // Dynamic color assignment
+        this.labelColorMap = new Map(); // Track which labels have which colors
+        this.colorPalette = [
+            { border: '#818cf8', background: 'rgba(129, 140, 248, 0.3)' },
+            { border: '#34d399', background: 'rgba(52, 211, 153, 0.3)' },
+            { border: '#fbbf24', background: 'rgba(251, 191, 36, 0.3)' },
+            { border: '#f472b6', background: 'rgba(244, 114, 182, 0.3)' },
+            { border: '#fb7185', background: 'rgba(251, 113, 133, 0.3)' },
+            { border: '#60a5fa', background: 'rgba(96, 165, 250, 0.3)' },
+            { border: '#a78bfa', background: 'rgba(167, 139, 250, 0.3)' },
+            { border: '#2dd4bf', background: 'rgba(45, 212, 191, 0.3)' },
+            { border: '#fb923c', background: 'rgba(251, 146, 60, 0.3)' },
+            { border: '#e879f9', background: 'rgba(232, 121, 249, 0.3)' },
+            { border: '#38bdf8', background: 'rgba(56, 189, 248, 0.3)' },
+            { border: '#4ade80', background: 'rgba(74, 222, 128, 0.3)' },
+            { border: '#facc15', background: 'rgba(250, 204, 21, 0.3)' },
+            { border: '#f87171', background: 'rgba(248, 113, 113, 0.3)' },
+            { border: '#c084fc', background: 'rgba(192, 132, 252, 0.3)' }
+        ];
+
         // Load config asynchronously
         this.init();
     }
@@ -451,10 +471,31 @@ class Neo4jManager {
     }
 
     /**
-     * Get color for node based on labels
+     * Simple hash function for consistent color assignment
+     */
+    hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return Math.abs(hash);
+    }
+
+    /**
+     * Get color for node based on labels (dynamic assignment)
      */
     getNodeColor(labels) {
-        const colors = {
+        // Predefined colors for common types
+        const predefinedColors = {
+            // Security & Threats
+            'Campaign': { border: '#ef4444', background: 'rgba(239, 68, 68, 0.3)' },
+            'Threat': { border: '#dc2626', background: 'rgba(220, 38, 38, 0.3)' },
+            'Malware': { border: '#991b1b', background: 'rgba(153, 27, 27, 0.3)' },
+            'Vulnerability': { border: '#f97316', background: 'rgba(249, 115, 22, 0.3)' },
+            'Attack': { border: '#ea580c', background: 'rgba(234, 88, 12, 0.3)' },
+
             // People & Users
             'Person': { border: '#818cf8', background: 'rgba(129, 140, 248, 0.3)' },
             'User': { border: '#60a5fa', background: 'rgba(96, 165, 250, 0.3)' },
@@ -464,97 +505,79 @@ class Neo4jManager {
             // Organizations
             'Company': { border: '#f472b6', background: 'rgba(244, 114, 182, 0.3)' },
             'Organization': { border: '#ec4899', background: 'rgba(236, 72, 153, 0.3)' },
-            'Department': { border: '#db2777', background: 'rgba(219, 39, 119, 0.3)' },
-
-            // Products & Commerce
-            'Product': { border: '#34d399', background: 'rgba(52, 211, 153, 0.3)' },
-            'Order': { border: '#fbbf24', background: 'rgba(251, 191, 36, 0.3)' },
-            'Invoice': { border: '#f59e0b', background: 'rgba(245, 158, 11, 0.3)' },
-            'Payment': { border: '#10b981', background: 'rgba(16, 185, 129, 0.3)' },
-
-            // Security & Threats
-            'Campaign': { border: '#ef4444', background: 'rgba(239, 68, 68, 0.3)' },
-            'Threat': { border: '#dc2626', background: 'rgba(220, 38, 38, 0.3)' },
-            'Malware': { border: '#991b1b', background: 'rgba(153, 27, 27, 0.3)' },
-            'Vulnerability': { border: '#f97316', background: 'rgba(249, 115, 22, 0.3)' },
-            'Attack': { border: '#ea580c', background: 'rgba(234, 88, 12, 0.3)' },
-
-            // Infrastructure
-            'Server': { border: '#8b5cf6', background: 'rgba(139, 92, 246, 0.3)' },
-            'Database': { border: '#7c3aed', background: 'rgba(124, 58, 237, 0.3)' },
-            'Service': { border: '#6366f1', background: 'rgba(99, 102, 241, 0.3)' },
-            'API': { border: '#4f46e5', background: 'rgba(79, 70, 229, 0.3)' },
-
-            // Locations & Geography
-            'Location': { border: '#fb7185', background: 'rgba(251, 113, 133, 0.3)' },
-            'Country': { border: '#f43f5e', background: 'rgba(244, 63, 94, 0.3)' },
-            'City': { border: '#e11d48', background: 'rgba(225, 29, 72, 0.3)' },
-
-            // Documents & Data
-            'Document': { border: '#06b6d4', background: 'rgba(6, 182, 212, 0.3)' },
-            'File': { border: '#0891b2', background: 'rgba(8, 145, 178, 0.3)' },
-            'Email': { border: '#0e7490', background: 'rgba(14, 116, 144, 0.3)' },
-
-            // Events & Activities
-            'Event': { border: '#a78bfa', background: 'rgba(167, 139, 250, 0.3)' },
-            'Activity': { border: '#c084fc', background: 'rgba(192, 132, 252, 0.3)' },
-            'Log': { border: '#d8b4fe', background: 'rgba(216, 180, 254, 0.3)' }
+            'Department': { border: '#db2777', background: 'rgba(219, 39, 119, 0.3)' }
         };
 
-        // Find matching label
+        // Check predefined colors first
         for (const label of labels) {
-            if (colors[label]) {
-                return colors[label];
+            if (predefinedColors[label]) {
+                return predefinedColors[label];
             }
         }
 
-        // Default color
-        return { border: '#667eea', background: 'rgba(102, 126, 234, 0.2)' };
+        // For unknown labels, use dynamic color assignment
+        const primaryLabel = labels[0] || 'Unknown';
+
+        // Check if we've already assigned a color to this label
+        if (this.labelColorMap.has(primaryLabel)) {
+            return this.labelColorMap.get(primaryLabel);
+        }
+
+        // Assign a new color based on hash
+        const hash = this.hashString(primaryLabel);
+        const colorIndex = hash % this.colorPalette.length;
+        const color = this.colorPalette[colorIndex];
+
+        // Store the assignment
+        this.labelColorMap.set(primaryLabel, color);
+
+        return color;
     }
 
     /**
-     * Get tooltip HTML for node
+     * Get tooltip for node (plain text with newlines)
      */
     getNodeTooltip(node) {
-        let html = `<strong>${node.labels.join(', ')}</strong><br>`;
-        html += `<span style="color: #9ca3af; font-size: 11px;">ID: ${node.id}</span><br><br>`;
+        let text = `${node.labels.join(', ')}\n`;
+        text += `ID: ${node.id}\n`;
 
         const propEntries = Object.entries(node.properties);
         if (propEntries.length > 0) {
+            text += `\nProperties:\n`;
             propEntries.forEach(([key, value]) => {
                 // Truncate long values
-                const displayValue = String(value).length > 50
-                    ? String(value).substring(0, 50) + '...'
+                const displayValue = String(value).length > 60
+                    ? String(value).substring(0, 60) + '...'
                     : value;
-                html += `<span style="color: #60a5fa;">${key}:</span> ${displayValue}<br>`;
+                text += `  ${key}: ${displayValue}\n`;
             });
         } else {
-            html += `<span style="color: #9ca3af; font-style: italic;">No properties</span>`;
+            text += `\nNo properties`;
         }
 
-        return html;
+        return text;
     }
 
     /**
-     * Get tooltip for edge
+     * Get tooltip for edge (plain text with newlines)
      */
     getEdgeTooltip(rel) {
-        let html = `<strong>${rel.type}</strong><br>`;
-        html += `<span style="color: #9ca3af; font-size: 11px;">ID: ${rel.id}</span><br>`;
+        let text = `${rel.type}\n`;
+        text += `ID: ${rel.id}\n`;
 
         if (rel.properties && Object.keys(rel.properties).length > 0) {
-            html += `<br>`;
+            text += `\nProperties:\n`;
             Object.entries(rel.properties).forEach(([key, value]) => {
-                const displayValue = String(value).length > 50
-                    ? String(value).substring(0, 50) + '...'
+                const displayValue = String(value).length > 60
+                    ? String(value).substring(0, 60) + '...'
                     : value;
-                html += `<span style="color: #60a5fa;">${key}:</span> ${displayValue}<br>`;
+                text += `  ${key}: ${displayValue}\n`;
             });
         } else {
-            html += `<br><span style="color: #9ca3af; font-style: italic;">No properties</span>`;
+            text += `\nNo properties`;
         }
 
-        return html;
+        return text;
     }
 
     /**
