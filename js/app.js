@@ -146,27 +146,28 @@ class NOXApp {
     setupTextareaAutoResize() {
         // Auto-resize textarea as user types, with max height of 200px
         const resizeTextarea = () => {
+            // Save cursor position
+            const start = this.chatInput.selectionStart;
+            const end = this.chatInput.selectionEnd;
+
             this.chatInput.style.height = 'auto';
-            this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 200) + 'px';
-            // Force scroll position to 0 to prevent any scrolling
-            this.chatInput.scrollTop = 0;
+            const newHeight = Math.min(this.chatInput.scrollHeight, 200);
+            this.chatInput.style.height = newHeight + 'px';
+
+            // Restore cursor position
+            this.chatInput.setSelectionRange(start, end);
+
+            // Only force scrollTop to 0 if at max height
+            if (this.chatInput.scrollHeight > 200) {
+                this.chatInput.scrollTop = this.chatInput.scrollHeight;
+            }
         };
 
         this.chatInput.addEventListener('input', resizeTextarea);
         this.chatInput.addEventListener('paste', resizeTextarea);
 
-        // Prevent any scrolling behavior that might interfere with arrow keys
-        this.chatInput.addEventListener('scroll', (e) => {
-            this.chatInput.scrollTop = 0;
-        });
-
-        // Reset height after sending message
-        const originalSendMessage = this.sendMessage.bind(this);
-        this.sendMessage = async function() {
-            await originalSendMessage();
-            this.chatInput.style.height = 'auto';
-            this.chatInput.scrollTop = 0;
-        }.bind(this);
+        // Initial call to set proper height
+        resizeTextarea();
     }
 
     setupN8NMonitoring() {
