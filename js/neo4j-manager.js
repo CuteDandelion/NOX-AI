@@ -396,7 +396,19 @@ class Neo4jManager {
                                 label: label,
                                 title: this.getNodeTooltip(node),
                                 color: color,
-                                size: 20 + (Object.keys(node.properties).length * 2)
+                                size: 20 + (Object.keys(node.properties).length * 2),
+                                font: {
+                                    size: 14,
+                                    color: '#ffffff',
+                                    face: 'system-ui, -apple-system, sans-serif',
+                                    strokeWidth: 3,
+                                    strokeColor: 'rgba(0, 0, 0, 0.8)'
+                                },
+                                // Store metadata for reference
+                                metadata: {
+                                    labels: node.labels,
+                                    properties: node.properties
+                                }
                             });
                         }
                     });
@@ -443,12 +455,50 @@ class Neo4jManager {
      */
     getNodeColor(labels) {
         const colors = {
+            // People & Users
             'Person': { border: '#818cf8', background: 'rgba(129, 140, 248, 0.3)' },
             'User': { border: '#60a5fa', background: 'rgba(96, 165, 250, 0.3)' },
+            'Employee': { border: '#38bdf8', background: 'rgba(56, 189, 248, 0.3)' },
+            'Customer': { border: '#0ea5e9', background: 'rgba(14, 165, 233, 0.3)' },
+
+            // Organizations
+            'Company': { border: '#f472b6', background: 'rgba(244, 114, 182, 0.3)' },
+            'Organization': { border: '#ec4899', background: 'rgba(236, 72, 153, 0.3)' },
+            'Department': { border: '#db2777', background: 'rgba(219, 39, 119, 0.3)' },
+
+            // Products & Commerce
             'Product': { border: '#34d399', background: 'rgba(52, 211, 153, 0.3)' },
             'Order': { border: '#fbbf24', background: 'rgba(251, 191, 36, 0.3)' },
-            'Company': { border: '#f472b6', background: 'rgba(244, 114, 182, 0.3)' },
-            'Location': { border: '#fb7185', background: 'rgba(251, 113, 133, 0.3)' }
+            'Invoice': { border: '#f59e0b', background: 'rgba(245, 158, 11, 0.3)' },
+            'Payment': { border: '#10b981', background: 'rgba(16, 185, 129, 0.3)' },
+
+            // Security & Threats
+            'Campaign': { border: '#ef4444', background: 'rgba(239, 68, 68, 0.3)' },
+            'Threat': { border: '#dc2626', background: 'rgba(220, 38, 38, 0.3)' },
+            'Malware': { border: '#991b1b', background: 'rgba(153, 27, 27, 0.3)' },
+            'Vulnerability': { border: '#f97316', background: 'rgba(249, 115, 22, 0.3)' },
+            'Attack': { border: '#ea580c', background: 'rgba(234, 88, 12, 0.3)' },
+
+            // Infrastructure
+            'Server': { border: '#8b5cf6', background: 'rgba(139, 92, 246, 0.3)' },
+            'Database': { border: '#7c3aed', background: 'rgba(124, 58, 237, 0.3)' },
+            'Service': { border: '#6366f1', background: 'rgba(99, 102, 241, 0.3)' },
+            'API': { border: '#4f46e5', background: 'rgba(79, 70, 229, 0.3)' },
+
+            // Locations & Geography
+            'Location': { border: '#fb7185', background: 'rgba(251, 113, 133, 0.3)' },
+            'Country': { border: '#f43f5e', background: 'rgba(244, 63, 94, 0.3)' },
+            'City': { border: '#e11d48', background: 'rgba(225, 29, 72, 0.3)' },
+
+            // Documents & Data
+            'Document': { border: '#06b6d4', background: 'rgba(6, 182, 212, 0.3)' },
+            'File': { border: '#0891b2', background: 'rgba(8, 145, 178, 0.3)' },
+            'Email': { border: '#0e7490', background: 'rgba(14, 116, 144, 0.3)' },
+
+            // Events & Activities
+            'Event': { border: '#a78bfa', background: 'rgba(167, 139, 250, 0.3)' },
+            'Activity': { border: '#c084fc', background: 'rgba(192, 132, 252, 0.3)' },
+            'Log': { border: '#d8b4fe', background: 'rgba(216, 180, 254, 0.3)' }
         };
 
         // Find matching label
@@ -467,9 +517,21 @@ class Neo4jManager {
      */
     getNodeTooltip(node) {
         let html = `<strong>${node.labels.join(', ')}</strong><br>`;
-        Object.entries(node.properties).forEach(([key, value]) => {
-            html += `${key}: ${value}<br>`;
-        });
+        html += `<span style="color: #9ca3af; font-size: 11px;">ID: ${node.id}</span><br><br>`;
+
+        const propEntries = Object.entries(node.properties);
+        if (propEntries.length > 0) {
+            propEntries.forEach(([key, value]) => {
+                // Truncate long values
+                const displayValue = String(value).length > 50
+                    ? String(value).substring(0, 50) + '...'
+                    : value;
+                html += `<span style="color: #60a5fa;">${key}:</span> ${displayValue}<br>`;
+            });
+        } else {
+            html += `<span style="color: #9ca3af; font-style: italic;">No properties</span>`;
+        }
+
         return html;
     }
 
@@ -478,11 +540,20 @@ class Neo4jManager {
      */
     getEdgeTooltip(rel) {
         let html = `<strong>${rel.type}</strong><br>`;
+        html += `<span style="color: #9ca3af; font-size: 11px;">ID: ${rel.id}</span><br>`;
+
         if (rel.properties && Object.keys(rel.properties).length > 0) {
+            html += `<br>`;
             Object.entries(rel.properties).forEach(([key, value]) => {
-                html += `${key}: ${value}<br>`;
+                const displayValue = String(value).length > 50
+                    ? String(value).substring(0, 50) + '...'
+                    : value;
+                html += `<span style="color: #60a5fa;">${key}:</span> ${displayValue}<br>`;
             });
+        } else {
+            html += `<br><span style="color: #9ca3af; font-style: italic;">No properties</span>`;
         }
+
         return html;
     }
 

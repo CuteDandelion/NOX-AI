@@ -477,6 +477,20 @@ body {
     border-bottom-color: var(--accent-primary);
 }
 
+/* User message links - make them more visible against the gradient background */
+.message.user-message .message-text a {
+    color: #ffffff;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: rgba(255, 255, 255, 0.5);
+    text-underline-offset: 2px;
+}
+
+.message.user-message .message-text a:hover {
+    text-decoration-color: rgba(255, 255, 255, 1);
+    border-bottom-color: transparent;
+}
+
 .message-text blockquote {
     margin: 12px 0;
     padding: 8px 12px;
@@ -1869,6 +1883,38 @@ body {
 
 .graph-status.loading::before {
     content: "⏳";
+}
+
+/* Vis.js Network Tooltips */
+.vis-tooltip {
+    position: absolute;
+    visibility: hidden;
+    padding: 12px 16px;
+    background: rgba(20, 25, 40, 0.98) !important;
+    color: #e1e4e8 !important;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    border-radius: 8px;
+    border: 1px solid rgba(124, 58, 237, 0.5) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(124, 58, 237, 0.2) !important;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10000;
+    max-width: 400px;
+    backdrop-filter: blur(10px);
+}
+
+.vis-tooltip strong {
+    color: #818cf8;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+.vis-tooltip br {
+    line-height: 1.8;
 }
 
 .graph-status.success::before {
