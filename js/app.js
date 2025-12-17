@@ -148,16 +148,24 @@ class NOXApp {
         const resizeTextarea = () => {
             this.chatInput.style.height = 'auto';
             this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 200) + 'px';
+            // Force scroll position to 0 to prevent any scrolling
+            this.chatInput.scrollTop = 0;
         };
 
         this.chatInput.addEventListener('input', resizeTextarea);
         this.chatInput.addEventListener('paste', resizeTextarea);
+
+        // Prevent any scrolling behavior that might interfere with arrow keys
+        this.chatInput.addEventListener('scroll', (e) => {
+            this.chatInput.scrollTop = 0;
+        });
 
         // Reset height after sending message
         const originalSendMessage = this.sendMessage.bind(this);
         this.sendMessage = async function() {
             await originalSendMessage();
             this.chatInput.style.height = 'auto';
+            this.chatInput.scrollTop = 0;
         }.bind(this);
     }
 

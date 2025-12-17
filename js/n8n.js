@@ -103,14 +103,22 @@ class N8NManager {
         });
 
         try {
+            // Create AbortController for 5-minute timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+
             const response = await fetch(this.config.webhookUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...(this.config.apiKey && { 'X-N8N-API-KEY': this.config.apiKey })
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                signal: controller.signal
             });
+
+            // Clear timeout on successful response
+            clearTimeout(timeoutId);
 
             console.log('📥 Webhook response status:', response.status, response.statusText);
 
@@ -149,6 +157,12 @@ class N8NManager {
             return data;
         } catch (error) {
             console.error('❌ Error sending message to n8n:', error);
+
+            // Provide better error message for timeout
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout: n8n workflow took longer than 5 minutes to respond. Please check your workflow or try again.');
+            }
+
             throw error;
         }
     }
