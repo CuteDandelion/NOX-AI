@@ -144,10 +144,21 @@ class NOXApp {
     }
 
     setupTextareaAutoResize() {
-        this.chatInput.addEventListener('input', () => {
+        // Auto-resize textarea as user types, with max height of 200px
+        const resizeTextarea = () => {
             this.chatInput.style.height = 'auto';
-            this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 150) + 'px';
-        });
+            this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 200) + 'px';
+        };
+
+        this.chatInput.addEventListener('input', resizeTextarea);
+        this.chatInput.addEventListener('paste', resizeTextarea);
+
+        // Reset height after sending message
+        const originalSendMessage = this.sendMessage.bind(this);
+        this.sendMessage = async function() {
+            await originalSendMessage();
+            this.chatInput.style.height = 'auto';
+        }.bind(this);
     }
 
     setupN8NMonitoring() {
