@@ -72,7 +72,6 @@ class NOXApp {
         this.setupWorkflowMonitoring();
         this.setupTextareaAutoResize();
         this.restoreSidebarStates();
-        this.renderChatList();
         this.loadCurrentChat();
     }
 
@@ -92,10 +91,6 @@ class NOXApp {
 
         // Voice input
         this.voiceButton.addEventListener('click', () => this.toggleVoiceRecording());
-
-        // Chat management (New Chat button removed to avoid input issues)
-        // document.getElementById('newChatBtn').addEventListener('click', () => this.createNewChat());
-        document.getElementById('chatList').addEventListener('click', (e) => this.handleChatListClick(e));
 
         // Scroll to bottom button
         this.scrollToBottomBtn.addEventListener('click', () => this.scrollToBottom(true));
@@ -146,8 +141,7 @@ class NOXApp {
             }
         });
 
-        // Sidebar toggles
-        document.getElementById('sidebarToggle').addEventListener('click', () => this.toggleSidebar());
+        // Execution panel toggle
         document.getElementById('executionPanelToggle').addEventListener('click', () => this.toggleExecutionPanel());
     }
 
@@ -477,49 +471,6 @@ class NOXApp {
 
     // ==================== Chat Management ====================
 
-    renderChatList() {
-        const chatList = document.getElementById('chatList');
-        const chats = chatManager.getAllChats();
-
-        chatList.innerHTML = chats.map(chat => `
-            <div class="chat-item ${chat.id === chatManager.currentChatId ? 'active' : ''}" data-chat-id="${chat.id}">
-                <span class="chat-item-title">${this.escapeHtml(chat.title)}</span>
-                <button class="chat-item-delete" data-chat-id="${chat.id}" title="Delete chat">×</button>
-            </div>
-        `).join('');
-    }
-
-    handleChatListClick(e) {
-        const chatItem = e.target.closest('.chat-item');
-        const deleteBtn = e.target.closest('.chat-item-delete');
-
-        if (deleteBtn) {
-            e.stopPropagation();
-            const chatId = deleteBtn.dataset.chatId;
-            if (confirm('Delete this chat?')) {
-                chatManager.deleteChat(chatId);
-                this.renderChatList();
-                this.loadCurrentChat();
-            }
-        } else if (chatItem) {
-            const chatId = chatItem.dataset.chatId;
-            chatManager.switchChat(chatId);
-            this.renderChatList();
-            this.loadCurrentChat();
-        }
-    }
-
-    createNewChat() {
-        chatManager.createNewChat();
-        this.renderChatList();
-        this.loadCurrentChat();
-
-        // Focus and ensure Edge doesn't re-enable autocomplete
-        this.chatInput.focus();
-        // Force Edge to respect our input settings after focus
-        this.chatInput.setAttribute('autocomplete', 'off');
-        this.chatInput.setAttribute('data-form-type', 'other');
-    }
 
     loadCurrentChat() {
         const messages = chatManager.getMessages();
@@ -646,7 +597,6 @@ class NOXApp {
         // Display user message
         this.displayMessage(userMessage);
         chatManager.addMessage(userMessage);
-        this.renderChatList();
 
         // Clear input
         this.chatInput.value = '';
@@ -711,7 +661,6 @@ class NOXApp {
             // Use streaming display for assistant messages
             await this.displayMessageWithStreaming(assistantMessage);
             chatManager.addMessage(assistantMessage);
-            this.renderChatList();
 
         } catch (error) {
             this.removeMessage(loadingId);
@@ -1581,15 +1530,6 @@ class NOXApp {
     /**
      * Toggle left sidebar (chat list)
      */
-    toggleSidebar() {
-        const sidebar = document.querySelector('.sidebar');
-        sidebar.classList.toggle('collapsed');
-
-        // Save state to localStorage
-        const isCollapsed = sidebar.classList.contains('collapsed');
-        localStorage.setItem('sidebar-collapsed', isCollapsed);
-    }
-
     /**
      * Toggle right execution panel
      */
@@ -1606,13 +1546,7 @@ class NOXApp {
      * Restore sidebar states from localStorage
      */
     restoreSidebarStates() {
-        // Restore left sidebar state
-        const sidebarCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-        if (sidebarCollapsed) {
-            document.querySelector('.sidebar').classList.add('collapsed');
-        }
-
-        // Restore right panel state
+        // Restore execution panel state
         const panelCollapsed = localStorage.getItem('execution-panel-collapsed') === 'true';
         if (panelCollapsed) {
             document.getElementById('executionPanel').classList.add('collapsed');
