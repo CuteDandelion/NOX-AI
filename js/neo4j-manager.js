@@ -247,7 +247,7 @@ class Neo4jManager {
                 hover: true,
                 tooltipDelay: 100,
                 navigationButtons: true,
-                keyboard: true,
+                keyboard: false, // Disable keyboard to prevent interference with chat input
                 zoomView: true,
                 dragView: true
             },
