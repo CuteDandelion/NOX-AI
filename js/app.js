@@ -481,7 +481,12 @@ class NOXApp {
         chatManager.createNewChat();
         this.renderChatList();
         this.loadCurrentChat();
+
+        // Focus and ensure Edge doesn't re-enable autocomplete
         this.chatInput.focus();
+        // Force Edge to respect our input settings after focus
+        this.chatInput.setAttribute('autocomplete', 'off');
+        this.chatInput.setAttribute('data-form-type', 'other');
     }
 
     loadCurrentChat() {
