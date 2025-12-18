@@ -60,9 +60,14 @@ class NOXApp {
         this.workflowSelect = document.getElementById('workflowSelect');
         this.executionsList = document.getElementById('executionsList');
         this.nodeLogsModal = document.getElementById('nodeLogsModal');
+        this.scrollToBottomBtn = document.getElementById('scrollToBottomBtn');
+
+        // Streaming state
+        this.currentStreamController = null;
 
         // Setup event listeners
         this.setupEventListeners();
+        this.setupScrollDetection();
         this.setupN8NMonitoring();
         this.setupWorkflowMonitoring();
         this.setupTextareaAutoResize();
@@ -88,9 +93,12 @@ class NOXApp {
         // Voice input
         this.voiceButton.addEventListener('click', () => this.toggleVoiceRecording());
 
-        // Chat management
-        document.getElementById('newChatBtn').addEventListener('click', () => this.createNewChat());
+        // Chat management (New Chat button removed to avoid input issues)
+        // document.getElementById('newChatBtn').addEventListener('click', () => this.createNewChat());
         document.getElementById('chatList').addEventListener('click', (e) => this.handleChatListClick(e));
+
+        // Scroll to bottom button
+        this.scrollToBottomBtn.addEventListener('click', () => this.scrollToBottom(true));
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -168,6 +176,30 @@ class NOXApp {
 
         // Initial call to set proper height
         resizeTextarea();
+    }
+
+    setupScrollDetection() {
+        // Show/hide scroll-to-bottom button based on scroll position
+        this.chatMessages.addEventListener('scroll', () => {
+            const isNearBottom = this.chatMessages.scrollHeight - this.chatMessages.scrollTop - this.chatMessages.clientHeight < 100;
+
+            if (isNearBottom) {
+                this.scrollToBottomBtn.style.display = 'none';
+            } else {
+                this.scrollToBottomBtn.style.display = 'flex';
+            }
+        });
+    }
+
+    scrollToBottom(smooth = false) {
+        if (smooth) {
+            this.chatMessages.scrollTo({
+                top: this.chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+        } else {
+            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        }
     }
 
     setupN8NMonitoring() {
@@ -670,13 +702,14 @@ class NOXApp {
 
             console.log('✅ Extracted reply text:', replyText);
 
-            // Display response
+            // Display response with streaming effect
             const assistantMessage = {
                 role: 'assistant',
                 content: replyText
             };
 
-            this.displayMessage(assistantMessage);
+            // Use streaming display for assistant messages
+            await this.displayMessageWithStreaming(assistantMessage);
             chatManager.addMessage(assistantMessage);
             this.renderChatList();
 
@@ -728,6 +761,112 @@ class NOXApp {
             reader.onerror = reject;
             reader.readAsDataURL(file);
         });
+    }
+
+    async displayMessageWithStreaming(message) {
+        // Cancel any previous stream
+        if (this.currentStreamController) {
+            this.currentStreamController.cancel();
+        }
+
+        // Create message element
+        const messageId = `msg-${Date.now()}`;
+        const messageEl = document.createElement('div');
+        messageEl.id = messageId;
+        messageEl.className = `message ${message.role}-message`;
+
+        // Create avatar and content structure
+        messageEl.innerHTML = `
+            <div class="message-avatar">
+                <img src="/nox/assets/nox-logo.png" alt="NOX" style="width: 32px; height: 32px; border-radius: 50%;">
+            </div>
+            <div class="message-content">
+                <div class="message-role">NOX Assistant</div>
+                <div class="message-text" id="${messageId}-text"></div>
+            </div>
+        `;
+
+        this.chatMessages.appendChild(messageEl);
+
+        // Get the text container
+        const textContainer = document.getElementById(`${messageId}-text`);
+
+        // Extract code blocks and tables before streaming
+        const { streamableText, blocks } = this.extractBlocks(message.content);
+
+        // Stream controller
+        const controller = {
+            cancelled: false,
+            cancel: () => {
+                controller.cancelled = true;
+            }
+        };
+        this.currentStreamController = controller;
+
+        // Stream the text word by word
+        await this.streamText(textContainer, streamableText, blocks, controller);
+
+        // Apply syntax highlighting
+        this.highlightCode();
+        this.setupCodeCopyButtons();
+
+        // Scroll to bottom
+        this.scrollToBottom();
+
+        // Clear stream controller
+        this.currentStreamController = null;
+    }
+
+    extractBlocks(content) {
+        // Extract code blocks and tables, replace with placeholders
+        const blocks = [];
+        let streamableText = content;
+
+        // Extract code blocks
+        streamableText = streamableText.replace(/```(\w+)?\n([\s\S]*?)```/g, (match) => {
+            const placeholder = `__BLOCK_${blocks.length}__`;
+            blocks.push({ type: 'code', content: match });
+            return placeholder;
+        });
+
+        // Extract tables (markdown tables with | separators)
+        streamableText = streamableText.replace(/(\|[^\n]+\|\n)+/g, (match) => {
+            const placeholder = `__BLOCK_${blocks.length}__`;
+            blocks.push({ type: 'table', content: match });
+            return placeholder;
+        });
+
+        return { streamableText, blocks };
+    }
+
+    async streamText(container, text, blocks, controller) {
+        const words = text.split(/(\s+)/); // Split by whitespace but keep the spaces
+        let currentText = '';
+
+        for (let i = 0; i < words.length; i++) {
+            if (controller.cancelled) break;
+
+            currentText += words[i];
+
+            // Replace block placeholders with actual content
+            let displayText = currentText;
+            blocks.forEach((block, index) => {
+                displayText = displayText.replace(`__BLOCK_${index}__`, block.content);
+            });
+
+            // Format and display
+            container.innerHTML = this.formatMessageContent(displayText);
+
+            // Delay between words (40ms = ~25 words per second)
+            await new Promise(resolve => setTimeout(resolve, 40));
+        }
+
+        // Final display with all content
+        let finalText = currentText;
+        blocks.forEach((block, index) => {
+            finalText = finalText.replace(`__BLOCK_${index}__`, block.content);
+        });
+        container.innerHTML = this.formatMessageContent(finalText);
     }
 
     displayMessage(message) {

@@ -50,14 +50,8 @@
                 </svg>
             </button>
             <div class="sidebar-header">
-                <button id="newChatBtn" class="new-chat-btn">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    New Chat
-                </button>
-                <button id="graphViewBtn" class="new-chat-btn" style="margin-top: 8px;">
+                <!-- New Chat button removed to avoid input issues -->
+                <button id="graphViewBtn" class="new-chat-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="18" cy="5" r="3"></circle>
                         <circle cx="6" cy="12" r="3"></circle>
@@ -106,6 +100,13 @@
                     <div id="chatMessages" class="chat-messages">
                         <!-- Messages will be inserted here -->
                     </div>
+
+                    <!-- Scroll to Bottom Button -->
+                    <button id="scrollToBottomBtn" class="scroll-to-bottom-btn" style="display: none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
 
                     <!-- Attached Files Preview -->
                     <div id="attachedFiles" class="attached-files" style="display: none;"></div>
