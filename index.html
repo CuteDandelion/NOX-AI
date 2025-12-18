@@ -391,7 +391,16 @@
                     </div>
                     <div class="form-group">
                         <label for="cypherQuery">Cypher Query:</label>
-                        <textarea id="cypherQuery" class="graph-query-input" placeholder="MATCH (n) RETURN n LIMIT 25" rows="2"></textarea>
+                        <textarea
+                            id="cypherQuery"
+                            class="graph-query-input"
+                            placeholder="MATCH (n) RETURN n LIMIT 25"
+                            rows="2"
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                        ></textarea>
                     </div>
                     <button id="executeQuery" class="btn-primary">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
