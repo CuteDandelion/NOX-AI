@@ -775,13 +775,15 @@ class NOXApp {
         messageEl.id = messageId;
         messageEl.className = `message ${message.role}-message`;
 
+        // Use the same avatar method as regular displayMessage
+        const avatar = this.getAvatarHTML(message.role);
+        const role = message.role === 'user' ? 'You' : 'NOX.AI';
+
         // Create avatar and content structure
         messageEl.innerHTML = `
-            <div class="message-avatar">
-                <img src="/nox/assets/nox-logo.png" alt="NOX" style="width: 32px; height: 32px; border-radius: 50%;">
-            </div>
+            <div class="message-avatar">${avatar}</div>
             <div class="message-content">
-                <div class="message-role">NOX Assistant</div>
+                <div class="message-role">${role}</div>
                 <div class="message-text" id="${messageId}-text"></div>
             </div>
         `;
@@ -1134,11 +1136,16 @@ class NOXApp {
         dbSelect.value = config.neo4jDatabase || 'neo4j';
 
         // Clear previous query and status
-        document.getElementById('cypherQuery').value = 'MATCH (n) RETURN n LIMIT 25';
+        const cypherQuery = document.getElementById('cypherQuery');
+        cypherQuery.value = 'MATCH (n) RETURN n LIMIT 25';
         this.updateGraphStatus('Ready. Enter a Cypher query and click "Execute Query".');
 
         // Show modal
         document.getElementById('graphViewModal').classList.remove('hidden');
+
+        // Reinforce attributes to prevent Edge autocomplete on graph query textarea
+        cypherQuery.setAttribute('autocomplete', 'off');
+        cypherQuery.setAttribute('data-form-type', 'other');
     }
 
     closeGraphView() {
@@ -1158,6 +1165,10 @@ class NOXApp {
         if (neo4jManager.viz) {
             neo4jManager.clearVisualization();
         }
+
+        // Reinforce chat input attributes to prevent Edge autocomplete re-enabling
+        this.chatInput.setAttribute('autocomplete', 'off');
+        this.chatInput.setAttribute('data-form-type', 'other');
     }
 
     async executeGraphQuery() {
