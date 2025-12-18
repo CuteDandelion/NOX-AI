@@ -111,11 +111,21 @@ class NOXApp {
         // Graph View
         document.getElementById('graphViewBtn').addEventListener('click', () => this.openGraphView());
         document.getElementById('closeGraphView').addEventListener('click', () => this.closeGraphView());
+        document.getElementById('minimizeGraphWindow').addEventListener('click', () => this.minimizeGraphWindow());
+        document.getElementById('maximizeGraphWindow').addEventListener('click', () => this.maximizeGraphWindow());
         document.getElementById('executeQuery').addEventListener('click', () => this.executeGraphQuery());
         document.getElementById('refreshGraph').addEventListener('click', () => this.refreshGraph());
         document.getElementById('clearGraph').addEventListener('click', () => this.clearGraph());
         document.getElementById('stabilizeGraph').addEventListener('click', () => this.stabilizeGraph());
         document.getElementById('toggleAutoRefresh').addEventListener('click', () => this.toggleGraphAutoRefresh());
+
+        // View mode switching
+        document.getElementById('viewModeGraph').addEventListener('click', () => this.switchViewMode('graph'));
+        document.getElementById('viewModeLogs').addEventListener('click', () => this.switchViewMode('logs'));
+        document.getElementById('viewModeSplit').addEventListener('click', () => this.switchViewMode('split'));
+
+        // Window dragging and resizing
+        this.setupWindowDragResize();
 
         // Workflow monitoring
         this.workflowSelect.addEventListener('change', (e) => this.handleWorkflowChange(e));
@@ -1089,8 +1099,12 @@ class NOXApp {
         cypherQuery.value = 'MATCH (n) RETURN n LIMIT 25';
         this.updateGraphStatus('Ready. Enter a Cypher query and click "Execute Query".');
 
-        // Show modal
-        document.getElementById('graphViewModal').classList.remove('hidden');
+        // Show floating window
+        const floatingWindow = document.getElementById('graphFloatingWindow');
+        floatingWindow.classList.remove('hidden');
+
+        // Restore window position and size from localStorage
+        this.restoreWindowState();
 
         // Reinforce attributes to prevent Edge autocomplete on graph query textarea
         cypherQuery.setAttribute('autocomplete', 'off');
@@ -1098,7 +1112,11 @@ class NOXApp {
     }
 
     closeGraphView() {
-        document.getElementById('graphViewModal').classList.add('hidden');
+        const floatingWindow = document.getElementById('graphFloatingWindow');
+        floatingWindow.classList.add('hidden');
+
+        // Save window state before closing
+        this.saveWindowState();
 
         // Stop auto-refresh if enabled
         if (this.graphAutoRefreshEnabled) {
@@ -1120,6 +1138,206 @@ class NOXApp {
         this.chatInput.setAttribute('data-form-type', 'other');
     }
 
+    minimizeGraphWindow() {
+        const floatingWindow = document.getElementById('graphFloatingWindow');
+        floatingWindow.classList.toggle('minimized');
+        this.saveWindowState();
+    }
+
+    maximizeGraphWindow() {
+        const floatingWindow = document.getElementById('graphFloatingWindow');
+        floatingWindow.classList.toggle('maximized');
+        this.saveWindowState();
+    }
+
+    switchViewMode(mode) {
+        // Update button states
+        document.querySelectorAll('.view-mode-btn').forEach(btn => btn.classList.remove('active'));
+
+        if (mode === 'graph') {
+            document.getElementById('viewModeGraph').classList.add('active');
+            document.getElementById('graphViewContent').classList.add('active');
+            document.getElementById('activityLogsContent').classList.remove('active');
+            document.getElementById('splitViewContent').classList.remove('active');
+        } else if (mode === 'logs') {
+            document.getElementById('viewModeLogs').classList.add('active');
+            document.getElementById('graphViewContent').classList.remove('active');
+            document.getElementById('activityLogsContent').classList.add('active');
+            document.getElementById('splitViewContent').classList.remove('active');
+        } else if (mode === 'split') {
+            document.getElementById('viewModeSplit').classList.add('active');
+            document.getElementById('graphViewContent').classList.remove('active');
+            document.getElementById('activityLogsContent').classList.remove('active');
+            document.getElementById('splitViewContent').classList.add('active');
+        }
+    }
+
+    saveWindowState() {
+        const floatingWindow = document.getElementById('graphFloatingWindow');
+        const isMinimized = floatingWindow.classList.contains('minimized');
+        const isMaximized = floatingWindow.classList.contains('maximized');
+
+        const state = {
+            left: floatingWindow.style.left || '40px',
+            top: floatingWindow.style.top || '100px',
+            width: floatingWindow.style.width || '800px',
+            height: floatingWindow.style.height || '600px',
+            minimized: isMinimized,
+            maximized: isMaximized
+        };
+
+        localStorage.setItem('graph-window-state', JSON.stringify(state));
+    }
+
+    restoreWindowState() {
+        const savedState = localStorage.getItem('graph-window-state');
+        if (!savedState) return;
+
+        try {
+            const state = JSON.parse(savedState);
+            const floatingWindow = document.getElementById('graphFloatingWindow');
+
+            floatingWindow.style.left = state.left;
+            floatingWindow.style.top = state.top;
+            floatingWindow.style.width = state.width;
+            floatingWindow.style.height = state.height;
+
+            if (state.minimized) {
+                floatingWindow.classList.add('minimized');
+            }
+            if (state.maximized) {
+                floatingWindow.classList.add('maximized');
+            }
+        } catch (error) {
+            console.error('Failed to restore window state:', error);
+        }
+    }
+
+    setupWindowDragResize() {
+        const floatingWindow = document.getElementById('graphFloatingWindow');
+        const titleBar = floatingWindow.querySelector('.window-title-bar');
+        const resizeHandle = floatingWindow.querySelector('.window-resize-handle');
+
+        let isDragging = false;
+        let isResizing = false;
+        let startX, startY, startLeft, startTop, startWidth, startHeight;
+
+        // Dragging functionality
+        titleBar.addEventListener('mousedown', (e) => {
+            // Don't drag if clicking on buttons
+            if (e.target.closest('.window-control-btn')) return;
+
+            // Don't drag if maximized
+            if (floatingWindow.classList.contains('maximized')) return;
+
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            const rect = floatingWindow.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+
+            e.preventDefault();
+        });
+
+        // Resizing functionality
+        resizeHandle.addEventListener('mousedown', (e) => {
+            // Don't resize if maximized
+            if (floatingWindow.classList.contains('maximized')) return;
+
+            isResizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            const rect = floatingWindow.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                floatingWindow.style.left = `${startLeft + deltaX}px`;
+                floatingWindow.style.top = `${startTop + deltaY}px`;
+                floatingWindow.style.right = 'auto';
+            } else if (isResizing) {
+                const deltaX = e.clientX - startX;
+                const deltaY = e.clientY - startY;
+
+                const newWidth = Math.max(400, startWidth + deltaX);
+                const newHeight = Math.max(300, startHeight + deltaY);
+
+                floatingWindow.style.width = `${newWidth}px`;
+                floatingWindow.style.height = `${newHeight}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging || isResizing) {
+                this.saveWindowState();
+            }
+            isDragging = false;
+            isResizing = false;
+        });
+    }
+
+    logNeo4jQuery(query, type = 'info', error = null) {
+        const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+        const logTimestamp = `[${timestamp}]`;
+
+        // Determine query type for color coding
+        let logClass = 'info';
+        let queryType = 'QUERY';
+
+        if (query.toUpperCase().includes('CREATE')) {
+            logClass = 'success';
+            queryType = 'CREATE';
+        } else if (query.toUpperCase().includes('MATCH')) {
+            logClass = 'info';
+            queryType = 'MATCH';
+        } else if (query.toUpperCase().includes('SET') || query.toUpperCase().includes('UPDATE')) {
+            logClass = 'warning';
+            queryType = 'UPDATE';
+        } else if (query.toUpperCase().includes('DELETE') || query.toUpperCase().includes('REMOVE')) {
+            logClass = 'error';
+            queryType = 'DELETE';
+        }
+
+        if (error) {
+            logClass = 'error';
+            queryType = 'ERROR';
+        }
+
+        // Create log entry
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${logClass}`;
+
+        const message = error
+            ? `${logTimestamp} ${queryType} Failed: ${error}\n  Query: ${query}`
+            : `${logTimestamp} ${queryType}: ${query}`;
+
+        logEntry.innerHTML = `<span class="log-timestamp">${logTimestamp}</span><span class="log-message">${this.escapeHtml(message.replace(logTimestamp + ' ', ''))}</span>`;
+
+        // Add to both logs and split view
+        const activityLogs = document.getElementById('activityLogs');
+        const activityLogsSplit = document.getElementById('activityLogsSplit');
+
+        if (activityLogs) {
+            activityLogs.appendChild(logEntry.cloneNode(true));
+            activityLogs.scrollTop = activityLogs.scrollHeight;
+        }
+
+        if (activityLogsSplit) {
+            activityLogsSplit.appendChild(logEntry.cloneNode(true));
+            activityLogsSplit.scrollTop = activityLogsSplit.scrollHeight;
+        }
+    }
+
     async executeGraphQuery() {
         const query = document.getElementById('cypherQuery').value.trim();
         const database = document.getElementById('graphDatabase').value;
@@ -1131,6 +1349,9 @@ class NOXApp {
 
         try {
             this.updateGraphStatus('Executing query via HTTP API...', 'loading');
+
+            // Log the query
+            this.logNeo4jQuery(query);
 
             // Initialize or update visualization
             if (!neo4jManager.network) {
@@ -1156,6 +1377,7 @@ class NOXApp {
             }
         } catch (error) {
             console.error('Graph query error:', error);
+            this.logNeo4jQuery(query, 'error', error.message);
             this.updateGraphStatus(`Error: ${error.message}`, 'error');
         }
     }
