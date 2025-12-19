@@ -95,6 +95,9 @@ class NOXApp {
         // Scroll to bottom button
         this.scrollToBottomBtn.addEventListener('click', () => this.scrollToBottom(true));
 
+        // Reset Chat
+        document.getElementById('resetChatBtn').addEventListener('click', () => this.resetChat());
+
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
         document.getElementById('closeSettings').addEventListener('click', () => this.closeSettings());
@@ -118,11 +121,6 @@ class NOXApp {
         document.getElementById('clearGraph').addEventListener('click', () => this.clearGraph());
         document.getElementById('stabilizeGraph').addEventListener('click', () => this.stabilizeGraph());
         document.getElementById('toggleAutoRefresh').addEventListener('click', () => this.toggleGraphAutoRefresh());
-
-        // View mode switching
-        document.getElementById('viewModeGraph').addEventListener('click', () => this.switchViewMode('graph'));
-        document.getElementById('viewModeLogs').addEventListener('click', () => this.switchViewMode('logs'));
-        document.getElementById('viewModeSplit').addEventListener('click', () => this.switchViewMode('split'));
 
         // Window dragging and resizing
         this.setupWindowDragResize();
@@ -494,6 +492,31 @@ class NOXApp {
             });
         }
 
+        this.scrollToBottom();
+    }
+
+    resetChat() {
+        // Create new chat session
+        chatManager.createNewChat();
+
+        // Clear chat display
+        this.chatMessages.innerHTML = '';
+
+        // Clear attached files
+        this.files = [];
+        this.renderAttachedFiles();
+
+        // Reset chat input
+        this.chatInput.value = '';
+        this.chatInput.style.height = 'auto';
+
+        // Show welcome message
+        this.addSystemMessage('🔄 Chat reset! Welcome to NOX.AI. How can I help you today?');
+
+        // Focus on input
+        this.chatInput.focus();
+
+        // Scroll to bottom
         this.scrollToBottom();
     }
 
@@ -1150,28 +1173,6 @@ class NOXApp {
         this.saveWindowState();
     }
 
-    switchViewMode(mode) {
-        // Update button states
-        document.querySelectorAll('.view-mode-btn').forEach(btn => btn.classList.remove('active'));
-
-        if (mode === 'graph') {
-            document.getElementById('viewModeGraph').classList.add('active');
-            document.getElementById('graphViewContent').classList.add('active');
-            document.getElementById('activityLogsContent').classList.remove('active');
-            document.getElementById('splitViewContent').classList.remove('active');
-        } else if (mode === 'logs') {
-            document.getElementById('viewModeLogs').classList.add('active');
-            document.getElementById('graphViewContent').classList.remove('active');
-            document.getElementById('activityLogsContent').classList.add('active');
-            document.getElementById('splitViewContent').classList.remove('active');
-        } else if (mode === 'split') {
-            document.getElementById('viewModeSplit').classList.add('active');
-            document.getElementById('graphViewContent').classList.remove('active');
-            document.getElementById('activityLogsContent').classList.remove('active');
-            document.getElementById('splitViewContent').classList.add('active');
-        }
-    }
-
     saveWindowState() {
         const floatingWindow = document.getElementById('graphFloatingWindow');
         const isMinimized = floatingWindow.classList.contains('minimized');
@@ -1286,58 +1287,6 @@ class NOXApp {
         });
     }
 
-    logNeo4jQuery(query, type = 'info', error = null) {
-        const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
-        const logTimestamp = `[${timestamp}]`;
-
-        // Determine query type for color coding
-        let logClass = 'info';
-        let queryType = 'QUERY';
-
-        if (query.toUpperCase().includes('CREATE')) {
-            logClass = 'success';
-            queryType = 'CREATE';
-        } else if (query.toUpperCase().includes('MATCH')) {
-            logClass = 'info';
-            queryType = 'MATCH';
-        } else if (query.toUpperCase().includes('SET') || query.toUpperCase().includes('UPDATE')) {
-            logClass = 'warning';
-            queryType = 'UPDATE';
-        } else if (query.toUpperCase().includes('DELETE') || query.toUpperCase().includes('REMOVE')) {
-            logClass = 'error';
-            queryType = 'DELETE';
-        }
-
-        if (error) {
-            logClass = 'error';
-            queryType = 'ERROR';
-        }
-
-        // Create log entry
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry ${logClass}`;
-
-        const message = error
-            ? `${logTimestamp} ${queryType} Failed: ${error}\n  Query: ${query}`
-            : `${logTimestamp} ${queryType}: ${query}`;
-
-        logEntry.innerHTML = `<span class="log-timestamp">${logTimestamp}</span><span class="log-message">${this.escapeHtml(message.replace(logTimestamp + ' ', ''))}</span>`;
-
-        // Add to both logs and split view
-        const activityLogs = document.getElementById('activityLogs');
-        const activityLogsSplit = document.getElementById('activityLogsSplit');
-
-        if (activityLogs) {
-            activityLogs.appendChild(logEntry.cloneNode(true));
-            activityLogs.scrollTop = activityLogs.scrollHeight;
-        }
-
-        if (activityLogsSplit) {
-            activityLogsSplit.appendChild(logEntry.cloneNode(true));
-            activityLogsSplit.scrollTop = activityLogsSplit.scrollHeight;
-        }
-    }
-
     async executeGraphQuery() {
         const query = document.getElementById('cypherQuery').value.trim();
         const database = document.getElementById('graphDatabase').value;
@@ -1349,9 +1298,6 @@ class NOXApp {
 
         try {
             this.updateGraphStatus('Executing query via HTTP API...', 'loading');
-
-            // Log the query
-            this.logNeo4jQuery(query);
 
             // Initialize or update visualization
             if (!neo4jManager.network) {
@@ -1377,7 +1323,6 @@ class NOXApp {
             }
         } catch (error) {
             console.error('Graph query error:', error);
-            this.logNeo4jQuery(query, 'error', error.message);
             this.updateGraphStatus(`Error: ${error.message}`, 'error');
         }
     }
