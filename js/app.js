@@ -50,6 +50,8 @@ class NOXApp {
 
         // Get DOM elements
         this.chatMessages = document.getElementById('chatMessages');
+        this.messagesContainer = document.querySelector('.messages-container');
+        this.backgroundGraphCanvas = document.getElementById('backgroundGraphCanvas');
         this.chatInput = document.getElementById('chatInput');
         this.sendButton = document.getElementById('sendButton');
         this.attachButton = document.getElementById('attachButton');
@@ -65,6 +67,11 @@ class NOXApp {
         // Streaming state
         this.currentStreamController = null;
 
+        // Background graph state
+        this.backgroundGraphNetwork = null;
+        this.backgroundGraphMode = localStorage.getItem('background-graph-mode') || 'graph'; // 'graph' or 'wallpaper'
+        this.graphOpacity = parseFloat(localStorage.getItem('graph-opacity') || '0.6');
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -73,6 +80,9 @@ class NOXApp {
         this.setupTextareaAutoResize();
         this.restoreSidebarStates();
         this.loadCurrentChat();
+
+        // Initialize background graph
+        await this.initializeBackgroundGraph();
     }
 
     setupEventListeners() {
@@ -482,7 +492,7 @@ class NOXApp {
 
     loadCurrentChat() {
         const messages = chatManager.getMessages();
-        this.chatMessages.innerHTML = '';
+        this.messagesContainer.innerHTML = '';
 
         if (messages.length === 0) {
             this.addSystemMessage('Welcome to NOX.AI. How can I help you today?');
@@ -500,7 +510,7 @@ class NOXApp {
         chatManager.createNewChat();
 
         // Clear chat display
-        this.chatMessages.innerHTML = '';
+        this.messagesContainer.innerHTML = '';
 
         // Clear attached files
         this.files = [];
@@ -770,7 +780,7 @@ class NOXApp {
             </div>
         `;
 
-        this.chatMessages.appendChild(messageEl);
+        this.messagesContainer.appendChild(messageEl);
 
         // Get the text container
         const textContainer = document.getElementById(`${messageId}-text`);
@@ -897,7 +907,7 @@ class NOXApp {
             `;
         }
 
-        this.chatMessages.appendChild(messageEl);
+        this.messagesContainer.appendChild(messageEl);
 
         // Apply syntax highlighting and setup copy buttons
         this.highlightCode();
@@ -928,7 +938,7 @@ class NOXApp {
             </div>
         `;
 
-        this.chatMessages.appendChild(messageEl);
+        this.messagesContainer.appendChild(messageEl);
         this.scrollToBottom();
 
         return loadingId;
@@ -1216,17 +1226,23 @@ class NOXApp {
 
     setupWindowDragResize() {
         const floatingWindow = document.getElementById('graphFloatingWindow');
-        const titleBar = floatingWindow.querySelector('.window-title-bar');
+        const header = floatingWindow.querySelector('.floating-window-header');
         const resizeHandle = floatingWindow.querySelector('.window-resize-handle');
 
         let isDragging = false;
         let isResizing = false;
         let startX, startY, startLeft, startTop, startWidth, startHeight;
 
-        // Dragging functionality
-        titleBar.addEventListener('mousedown', (e) => {
-            // Don't drag if clicking on buttons
-            if (e.target.closest('.window-control-btn')) return;
+        // Dragging functionality - entire header is draggable
+        header.addEventListener('mousedown', (e) => {
+            // Don't drag if clicking on buttons or input elements
+            if (e.target.closest('.window-control-btn') ||
+                e.target.closest('button') ||
+                e.target.closest('input') ||
+                e.target.closest('select') ||
+                e.target.closest('textarea')) {
+                return;
+            }
 
             // Don't drag if maximized
             if (floatingWindow.classList.contains('maximized')) return;
@@ -1717,6 +1733,153 @@ class NOXApp {
         const panelCollapsed = localStorage.getItem('execution-panel-collapsed') === 'true';
         if (panelCollapsed) {
             document.getElementById('executionPanel').classList.add('collapsed');
+        }
+    }
+
+    // ==================== Background Graph ====================
+
+    /**
+     * Initialize background graph visualization
+     */
+    async initializeBackgroundGraph() {
+        // Check if Neo4j is configured
+        const config = neo4jManager.getConfig();
+        if (!config.neo4jUrl || !config.neo4jUsername || !config.neo4jPassword) {
+            console.log('Neo4j not configured, skipping background graph');
+            return;
+        }
+
+        // Check mode
+        if (this.backgroundGraphMode === 'wallpaper') {
+            this.backgroundGraphCanvas.style.backgroundImage = "url('/nox/assets/starry-wallpaper.jpg')";
+            this.backgroundGraphCanvas.style.backgroundSize = "cover";
+            this.backgroundGraphCanvas.style.backgroundPosition = "center";
+            return;
+        }
+
+        try {
+            // Create simple welcome graph
+            const welcomeQuery = `
+                MATCH (n)
+                RETURN n
+                LIMIT 15
+            `;
+
+            const result = await neo4jManager.executeQuery(welcomeQuery);
+            const graphData = neo4jManager.transformToGraphData(result);
+
+            if (graphData.nodes.length === 0) {
+                // No data, show wallpaper instead
+                this.backgroundGraphCanvas.style.backgroundImage = "url('/nox/assets/starry-wallpaper.jpg')";
+                this.backgroundGraphCanvas.style.backgroundSize = "cover";
+                this.backgroundGraphCanvas.style.backgroundPosition = "center";
+                return;
+            }
+
+            // Initialize vis.js network
+            const nodes = new vis.DataSet(graphData.nodes);
+            const edges = new vis.DataSet(graphData.edges);
+
+            const data = { nodes, edges };
+
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    size: 20,
+                    font: {
+                        size: 12,
+                        color: '#e1e4e8'
+                    },
+                    borderWidth: 2,
+                    shadow: {
+                        enabled: true,
+                        color: 'rgba(0,0,0,0.3)',
+                        size: 10,
+                        x: 0,
+                        y: 0
+                    }
+                },
+                edges: {
+                    width: 1.5,
+                    color: {
+                        color: 'rgba(124, 58, 237, 0.3)',
+                        highlight: 'rgba(124, 58, 237, 0.6)'
+                    },
+                    smooth: {
+                        type: 'continuous',
+                        roundness: 0.5
+                    },
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 0.5
+                        }
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    stabilization: {
+                        enabled: true,
+                        iterations: 100
+                    },
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        centralGravity: 0.1,
+                        springLength: 150,
+                        springConstant: 0.01
+                    }
+                },
+                interaction: {
+                    dragNodes: false,
+                    dragView: false,
+                    zoomView: false,
+                    selectable: false,
+                    hover: false,
+                    keyboard: false
+                }
+            };
+
+            this.backgroundGraphNetwork = new vis.Network(this.backgroundGraphCanvas, data, options);
+
+            // Add gentle pulse animation to nodes
+            setInterval(() => {
+                if (this.backgroundGraphNetwork) {
+                    const allNodes = nodes.get();
+                    allNodes.forEach(node => {
+                        const currentSize = node.size || 20;
+                        const newSize = 20 + Math.sin(Date.now() / 1000 + node.id) * 3;
+                        nodes.update({ id: node.id, size: newSize });
+                    });
+                }
+            }, 50);
+
+        } catch (error) {
+            console.error('Failed to initialize background graph:', error);
+            // Fallback to wallpaper
+            this.backgroundGraphCanvas.style.backgroundImage = "url('/nox/assets/starry-wallpaper.jpg')";
+            this.backgroundGraphCanvas.style.backgroundSize = "cover";
+            this.backgroundGraphCanvas.style.backgroundPosition = "center";
+        }
+    }
+
+    /**
+     * Toggle between graph and wallpaper mode
+     */
+    toggleBackgroundMode() {
+        this.backgroundGraphMode = this.backgroundGraphMode === 'graph' ? 'wallpaper' : 'graph';
+        localStorage.setItem('background-graph-mode', this.backgroundGraphMode);
+        this.initializeBackgroundGraph();
+    }
+
+    /**
+     * Update graph opacity
+     */
+    setGraphOpacity(opacity) {
+        this.graphOpacity = opacity;
+        localStorage.setItem('graph-opacity', opacity);
+        const overlay = document.querySelector('.background-overlay');
+        if (overlay) {
+            overlay.style.opacity = 1 - opacity; // Inverse - higher graph opacity = lower overlay
         }
     }
 
