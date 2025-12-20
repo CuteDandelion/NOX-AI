@@ -154,14 +154,40 @@ body {
 .chat-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 30px;
     position: relative;
     background: #0a0e27;
-    background-image: url('/nox/assets/starry-wallpaper.jpg');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+}
+
+/* Background Graph Canvas - Layer 1 */
+.background-graph-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none; /* Let clicks pass through to messages */
+}
+
+/* Dark Overlay - Layer 2 */
+.background-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 14, 39, 0.4); /* 40% dark overlay */
+    z-index: 2;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+/* Messages Container - Layer 3 */
+.messages-container {
+    position: relative;
+    z-index: 3;
+    padding: 30px;
+    min-height: 100%;
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -1709,6 +1735,7 @@ body {
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
     user-select: none;
+    cursor: move; /* Entire header is draggable */
 }
 
 .window-title-bar {
@@ -1716,7 +1743,6 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 8px 12px;
-    cursor: move;
 }
 
 .window-title {
