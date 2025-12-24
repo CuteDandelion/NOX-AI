@@ -517,39 +517,248 @@ body {
 }
 
 /* Attached Files */
+/* ====================================
+   File Preview - Glass Morphism
+   ==================================== */
 .attached-files {
-    padding: 12px 20px;
-    border-top: 1px solid var(--border-color);
+    padding: 16px 20px;
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
 }
 
-.attached-file {
-    position: relative;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 8px 12px;
+/* File Preview Card - Glass Morphism */
+.file-preview-card {
+    background: rgba(25, 30, 45, 0.85);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1.5px solid rgba(124, 58, 237, 0.3);
+    border-radius: 16px;
+    padding: 16px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 20px rgba(124, 58, 237, 0.1);
+    animation: slideInFade 0.3s ease-out;
+}
+
+@keyframes slideInFade {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* File Preview Header */
+.file-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.file-preview-info {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.file-preview-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.file-preview-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-preview-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.file-preview-size {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.file-preview-remove {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+
+.file-preview-remove:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.5);
+    transform: scale(1.05);
+}
+
+/* Image Thumbnail Preview */
+.file-preview-thumbnail {
+    width: 100%;
+    max-height: 200px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-preview-thumbnail img {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    0% {
+        opacity: 0;
+        filter: blur(4px);
+    }
+    100% {
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+/* Loading State */
+.file-loading-spinner {
+    width: 100%;
+    height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.spinner-icon {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(124, 58, 237, 0.2);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
     font-size: 13px;
     color: var(--text-secondary);
 }
 
-.attached-file-remove {
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
-    line-height: 1;
+/* Progress Bar for Large Files */
+.file-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(124, 58, 237, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
 }
 
-.attached-file-remove:hover {
-    color: var(--node-error);
+.file-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), #a78bfa);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(124, 58, 237, 0.5);
+}
+
+/* Error State */
+.file-error-card {
+    background: rgba(239, 68, 68, 0.1);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1.5px solid rgba(239, 68, 68, 0.4);
+    border-radius: 16px;
+    padding: 16px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 20px rgba(239, 68, 68, 0.2);
+    animation: slideInFade 0.3s ease-out;
+}
+
+.file-error-icon {
+    font-size: 24px;
+    color: #ef4444;
+}
+
+.file-error-message {
+    flex: 1;
+    font-size: 14px;
+    color: #fca5a5;
+    font-weight: 500;
+}
+
+.file-error-close {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.file-error-close:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* File Type Icons (for non-images) */
+.file-type-icon {
+    width: 100%;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+}
+
+.file-type-icon-large {
+    font-size: 64px;
+    opacity: 0.7;
 }
 
 /* Chat Input */

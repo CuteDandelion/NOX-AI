@@ -522,38 +522,264 @@ class NOXApp {
 
     // ==================== File Handling ====================
 
-    handleFileSelect(e) {
-        const newFiles = Array.from(e.target.files);
-        this.files = [...this.files, ...newFiles];
-        this.renderAttachedFiles();
-        e.target.value = ''; // Reset input
-    }
+    async handleFileSelect(e) {
+        const selectedFile = e.target.files[0];
+        e.target.value = ''; // Reset input immediately
 
-    renderAttachedFiles() {
-        if (this.files.length === 0) {
-            this.attachedFiles.style.display = 'none';
+        if (!selectedFile) return;
+
+        // Validate file
+        const validation = this.validateFile(selectedFile);
+        if (!validation.valid) {
+            this.showFileError(validation.error);
             return;
         }
 
-        this.attachedFiles.style.display = 'flex';
-        this.attachedFiles.innerHTML = this.files.map((file, index) => `
-            <div class="attached-file">
-                ${this.getFileIcon(file.type)} ${this.escapeHtml(file.name)}
-                <button class="attached-file-remove" data-index="${index}">×</button>
-            </div>
-        `).join('');
+        // Replace previous file (only 1 at a time)
+        this.files = [selectedFile];
 
-        // Add remove handlers
-        this.attachedFiles.querySelectorAll('.attached-file-remove').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const index = parseInt(btn.dataset.index);
-                this.files.splice(index, 1);
-                this.renderAttachedFiles();
-            });
+        // Show loading state
+        this.showFileLoading();
+
+        // Generate preview based on file type
+        try {
+            await this.generateFilePreview(selectedFile);
+        } catch (error) {
+            console.error('Error generating preview:', error);
+            this.showFileError('Unable to read file. Please try again.');
+        }
+    }
+
+    validateFile(file) {
+        const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+
+        // Allowed file types
+        const allowedTypes = {
+            // Images
+            'image/png': true,
+            'image/jpeg': true,
+            'image/jpg': true,
+            'image/gif': true,
+            'image/webp': true,
+            // Documents
+            'application/pdf': true,
+            'text/plain': true,
+            'text/html': true,
+            'text/markdown': true,
+            'application/json': true,
+            'text/csv': true
+        };
+
+        // Check file type
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        const allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'txt', 'html', 'md', 'json', 'csv'];
+
+        if (!allowedTypes[file.type] && !allowedExtensions.includes(fileExtension)) {
+            return {
+                valid: false,
+                error: 'Invalid file type. Only images, PDFs, and text files are allowed.'
+            };
+        }
+
+        // Check file size
+        if (file.size > maxSize) {
+            return {
+                valid: false,
+                error: `File size exceeds 10MB limit (${this.formatFileSize(file.size)} provided).`
+            };
+        }
+
+        return { valid: true };
+    }
+
+    showFileLoading() {
+        this.attachedFiles.style.display = 'flex';
+        this.attachedFiles.innerHTML = `
+            <div class="file-preview-card">
+                <div class="file-loading-spinner">
+                    <div class="spinner-icon"></div>
+                    <div class="loading-text">Loading file...</div>
+                </div>
+            </div>
+        `;
+    }
+
+    showFileError(errorMessage) {
+        this.attachedFiles.style.display = 'flex';
+        this.attachedFiles.innerHTML = `
+            <div class="file-error-card">
+                <div class="file-preview-info">
+                    <div class="file-error-icon">⚠️</div>
+                    <div class="file-error-message">${this.escapeHtml(errorMessage)}</div>
+                    <button class="file-error-close" id="closeFileError">×</button>
+                </div>
+            </div>
+        `;
+
+        // Add close handler
+        document.getElementById('closeFileError').addEventListener('click', () => {
+            this.files = [];
+            this.attachedFiles.style.display = 'none';
+        });
+
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            if (this.files.length === 0) {
+                this.attachedFiles.style.display = 'none';
+            }
+        }, 5000);
+    }
+
+    async generateFilePreview(file) {
+        const fileInfo = this.getFileTypeInfo(file);
+
+        // For images, generate thumbnail
+        if (fileInfo.category === 'image') {
+            const previewUrl = await this.readFileAsDataURL(file);
+            this.renderFilePreview(file, fileInfo, previewUrl);
+        } else {
+            // For non-images, just show icon
+            this.renderFilePreview(file, fileInfo, null);
+        }
+    }
+
+    readFileAsDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('Failed to read file'));
+
+            // For large files, track progress
+            if (file.size > 5 * 1024 * 1024) { // > 5MB
+                reader.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percentLoaded = Math.round((e.loaded / e.total) * 100);
+                        this.updateLoadingProgress(percentLoaded);
+                    }
+                };
+            }
+
+            reader.readAsDataURL(file);
         });
     }
 
+    updateLoadingProgress(percent) {
+        const spinner = document.querySelector('.file-loading-spinner');
+        if (spinner && percent > 0) {
+            spinner.innerHTML = `
+                <div class="spinner-icon"></div>
+                <div class="loading-text">Loading... ${percent}%</div>
+                <div class="file-progress-bar">
+                    <div class="file-progress-fill" style="width: ${percent}%"></div>
+                </div>
+            `;
+        }
+    }
+
+    renderFilePreview(file, fileInfo, previewUrl) {
+        this.attachedFiles.style.display = 'flex';
+
+        let previewContent = '';
+        if (previewUrl && fileInfo.category === 'image') {
+            previewContent = `
+                <div class="file-preview-thumbnail">
+                    <img src="${previewUrl}" alt="${this.escapeHtml(file.name)}">
+                </div>
+            `;
+        } else {
+            previewContent = `
+                <div class="file-type-icon">
+                    <div class="file-type-icon-large">${fileInfo.icon}</div>
+                </div>
+            `;
+        }
+
+        this.attachedFiles.innerHTML = `
+            <div class="file-preview-card">
+                <div class="file-preview-header">
+                    <div class="file-preview-info">
+                        <div class="file-preview-icon">${fileInfo.icon}</div>
+                        <div class="file-preview-details">
+                            <div class="file-preview-name">${this.escapeHtml(file.name)}</div>
+                            <div class="file-preview-size">${this.formatFileSize(file.size)}</div>
+                        </div>
+                    </div>
+                    <button class="file-preview-remove" id="removeFilePreview">×</button>
+                </div>
+                ${previewContent}
+            </div>
+        `;
+
+        // Add remove handler
+        document.getElementById('removeFilePreview').addEventListener('click', () => {
+            this.files = [];
+            this.attachedFiles.style.display = 'none';
+        });
+    }
+
+    getFileTypeInfo(file) {
+        const extension = file.name.split('.').pop().toLowerCase();
+
+        // Images
+        if (file.type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)) {
+            return { category: 'image', icon: '🖼️' };
+        }
+
+        // PDF
+        if (file.type === 'application/pdf' || extension === 'pdf') {
+            return { category: 'pdf', icon: '📄' };
+        }
+
+        // HTML
+        if (file.type === 'text/html' || extension === 'html') {
+            return { category: 'html', icon: '🌐' };
+        }
+
+        // JSON
+        if (file.type === 'application/json' || extension === 'json') {
+            return { category: 'json', icon: '📊' };
+        }
+
+        // CSV
+        if (extension === 'csv') {
+            return { category: 'csv', icon: '📈' };
+        }
+
+        // Markdown
+        if (extension === 'md') {
+            return { category: 'markdown', icon: '📝' };
+        }
+
+        // Plain text
+        if (file.type.startsWith('text/') || extension === 'txt') {
+            return { category: 'text', icon: '📝' };
+        }
+
+        // Default
+        return { category: 'unknown', icon: '📎' };
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    renderAttachedFiles() {
+        // This method is now handled by renderFilePreview
+        // Kept for backwards compatibility
+        if (this.files.length === 0) {
+            this.attachedFiles.style.display = 'none';
+        }
+    }
+
     getFileIcon(type) {
+        // Kept for backwards compatibility
         if (type.startsWith('image/')) return '🖼️';
         if (type === 'application/pdf') return '📄';
         if (type.includes('text')) return '📝';
@@ -880,19 +1106,11 @@ class NOXApp {
             const avatar = this.getAvatarHTML(message.role);
             const role = message.role === 'user' ? 'You' : 'NOX.AI';
 
-            let filesHtml = '';
-            if (message.files && message.files.length > 0) {
-                filesHtml = `<div style="margin-top: 8px; font-size: 13px; color: var(--text-tertiary);">
-                    ${message.files.map(f => `${this.getFileIcon(f.type)} ${f.name}`).join(', ')}
-                </div>`;
-            }
-
             messageEl.innerHTML = `
                 <div class="message-avatar">${avatar}</div>
                 <div class="message-content">
                     <div class="message-role">${role}</div>
                     <div class="message-text">${this.formatMessageContent(message.content)}</div>
-                    ${filesHtml}
                 </div>
             `;
         }
