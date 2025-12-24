@@ -593,26 +593,22 @@ class NOXApp {
     }
 
     showFileLoading() {
-        this.attachedFiles.style.display = 'flex';
+        this.attachedFiles.style.display = 'block';
         this.attachedFiles.innerHTML = `
-            <div class="file-preview-card">
+            <div class="file-preview-card" data-tooltip="Loading file...">
                 <div class="file-loading-spinner">
                     <div class="spinner-icon"></div>
-                    <div class="loading-text">Loading file...</div>
                 </div>
             </div>
         `;
     }
 
     showFileError(errorMessage) {
-        this.attachedFiles.style.display = 'flex';
+        this.attachedFiles.style.display = 'block';
         this.attachedFiles.innerHTML = `
-            <div class="file-error-card">
-                <div class="file-preview-info">
-                    <div class="file-error-icon">⚠️</div>
-                    <div class="file-error-message">${this.escapeHtml(errorMessage)}</div>
-                    <button class="file-error-close" id="closeFileError">×</button>
-                </div>
+            <div class="file-error-card" data-error="${this.escapeHtml(errorMessage)}">
+                <div class="file-error-icon">⚠️</div>
+                <button class="file-error-close" id="closeFileError">×</button>
             </div>
         `;
 
@@ -665,49 +661,46 @@ class NOXApp {
     }
 
     updateLoadingProgress(percent) {
-        const spinner = document.querySelector('.file-loading-spinner');
-        if (spinner && percent > 0) {
-            spinner.innerHTML = `
-                <div class="spinner-icon"></div>
-                <div class="loading-text">Loading... ${percent}%</div>
-                <div class="file-progress-bar">
-                    <div class="file-progress-fill" style="width: ${percent}%"></div>
-                </div>
-            `;
+        const card = document.querySelector('.file-preview-card');
+        if (card && percent > 0) {
+            card.setAttribute('data-tooltip', `Loading... ${percent}%`);
+            const spinner = card.querySelector('.file-loading-spinner');
+            if (spinner) {
+                spinner.innerHTML = `
+                    <div class="spinner-icon"></div>
+                    <div class="file-progress-bar">
+                        <div class="file-progress-fill" style="width: ${percent}%"></div>
+                    </div>
+                `;
+            }
         }
     }
 
     renderFilePreview(file, fileInfo, previewUrl) {
-        this.attachedFiles.style.display = 'flex';
+        this.attachedFiles.style.display = 'block';
+
+        // Create tooltip text: "filename (size)"
+        const tooltip = `${file.name} (${this.formatFileSize(file.size)})`;
 
         let previewContent = '';
         if (previewUrl && fileInfo.category === 'image') {
+            // Image thumbnail
             previewContent = `
                 <div class="file-preview-thumbnail">
                     <img src="${previewUrl}" alt="${this.escapeHtml(file.name)}">
                 </div>
             `;
         } else {
+            // File type icon for non-images
             previewContent = `
-                <div class="file-type-icon">
-                    <div class="file-type-icon-large">${fileInfo.icon}</div>
-                </div>
+                <div class="file-type-icon">${fileInfo.icon}</div>
             `;
         }
 
         this.attachedFiles.innerHTML = `
-            <div class="file-preview-card">
-                <div class="file-preview-header">
-                    <div class="file-preview-info">
-                        <div class="file-preview-icon">${fileInfo.icon}</div>
-                        <div class="file-preview-details">
-                            <div class="file-preview-name">${this.escapeHtml(file.name)}</div>
-                            <div class="file-preview-size">${this.formatFileSize(file.size)}</div>
-                        </div>
-                    </div>
-                    <button class="file-preview-remove" id="removeFilePreview">×</button>
-                </div>
+            <div class="file-preview-card" data-tooltip="${this.escapeHtml(tooltip)}">
                 ${previewContent}
+                <button class="file-preview-remove" id="removeFilePreview">×</button>
             </div>
         `;
 
