@@ -19,6 +19,7 @@ class NOXApp {
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.files = [];
+        this.currentFilePreviewData = null; // Store file preview info for chat display
 
         // Workflow monitoring
         this.workflowSelect = null;
@@ -65,6 +66,15 @@ class NOXApp {
         // Streaming state
         this.currentStreamController = null;
 
+        // Streaming speed settings
+        this.streamingSpeedOptions = {
+            slow: 80,      // 80ms/word (~12 words/sec)
+            normal: 40,    // 40ms/word (~25 words/sec)
+            fast: 15,      // 15ms/word (~65 words/sec)
+            instant: 0     // 0ms - immediate display
+        };
+        this.currentStreamingSpeed = localStorage.getItem('streaming-speed') || 'normal';
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -97,6 +107,9 @@ class NOXApp {
 
         // Reset Chat
         document.getElementById('resetChatBtn').addEventListener('click', () => this.resetChat());
+
+        // Streaming Speed
+        this.setupStreamingSpeed();
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -477,6 +490,60 @@ class NOXApp {
         }
     }
 
+    // ==================== Streaming Speed ====================
+
+    setupStreamingSpeed() {
+        const speedButton = document.getElementById('streamSpeedButton');
+        const speedMenu = document.getElementById('streamSpeedMenu');
+        const speedOptions = speedMenu.querySelectorAll('.speed-option');
+
+        // Update active state on load
+        this.updateSpeedMenuActive();
+
+        // Toggle menu on button click
+        speedButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = speedMenu.style.display === 'block';
+            speedMenu.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Speed option selection
+        speedOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const speed = option.dataset.speed;
+                this.setStreamingSpeed(speed);
+                speedMenu.style.display = 'none';
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!speedButton.contains(e.target) && !speedMenu.contains(e.target)) {
+                speedMenu.style.display = 'none';
+            }
+        });
+    }
+
+    setStreamingSpeed(speed) {
+        if (this.streamingSpeedOptions[speed] !== undefined) {
+            this.currentStreamingSpeed = speed;
+            localStorage.setItem('streaming-speed', speed);
+            this.updateSpeedMenuActive();
+            console.log(`✨ Streaming speed set to: ${speed} (${this.streamingSpeedOptions[speed]}ms/word)`);
+        }
+    }
+
+    updateSpeedMenuActive() {
+        const speedOptions = document.querySelectorAll('.speed-option');
+        speedOptions.forEach(option => {
+            if (option.dataset.speed === this.currentStreamingSpeed) {
+                option.classList.add('active');
+            } else {
+                option.classList.remove('active');
+            }
+        });
+    }
+
     // ==================== Chat Management ====================
 
 
@@ -682,6 +749,16 @@ class NOXApp {
         // Create tooltip text: "filename (size)"
         const tooltip = `${file.name} (${this.formatFileSize(file.size)})`;
 
+        // Get file extension for badge
+        const extension = file.name.split('.').pop().toUpperCase();
+
+        // Store preview data for chat bubble display
+        this.currentFilePreviewData = {
+            previewUrl: previewUrl,
+            fileInfo: fileInfo,
+            extension: extension
+        };
+
         let previewContent = '';
         if (previewUrl && fileInfo.category === 'image') {
             // Image thumbnail
@@ -700,6 +777,7 @@ class NOXApp {
         this.attachedFiles.innerHTML = `
             <div class="file-preview-card" data-tooltip="${this.escapeHtml(tooltip)}">
                 ${previewContent}
+                <div class="file-type-badge">${extension}</div>
                 <button class="file-preview-remove" id="removeFilePreview">×</button>
             </div>
         `;
@@ -843,7 +921,8 @@ class NOXApp {
         const userMessage = {
             role: 'user',
             content: message,
-            files: this.files.map(f => ({ name: f.name, type: f.type, size: f.size }))
+            files: this.files.map(f => ({ name: f.name, type: f.type, size: f.size })),
+            filePreview: this.currentFilePreviewData // Include preview data
         };
 
         // Display user message
@@ -857,6 +936,7 @@ class NOXApp {
         // Prepare files for upload
         const filesToSend = [...this.files];
         this.files = [];
+        this.currentFilePreviewData = null; // Clear preview data
         this.renderAttachedFiles();
 
         // Set processing state
@@ -1084,8 +1164,11 @@ class NOXApp {
             // Format and display
             container.innerHTML = this.formatMessageContent(displayText);
 
-            // Delay between words (40ms = ~25 words per second)
-            await new Promise(resolve => setTimeout(resolve, 40));
+            // Delay between words (configurable speed)
+            const delay = this.streamingSpeedOptions[this.currentStreamingSpeed] || 40;
+            if (delay > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
         }
 
         // Final display with all content
@@ -1123,10 +1206,33 @@ class NOXApp {
             const avatar = this.getAvatarHTML(message.role);
             const role = message.role === 'user' ? 'You' : 'NOX.AI';
 
+            // Generate file preview HTML if present
+            let filePreviewHTML = '';
+            if (message.filePreview && message.role === 'user') {
+                const { previewUrl, fileInfo, extension } = message.filePreview;
+
+                let previewContent = '';
+                if (previewUrl && fileInfo.category === 'image') {
+                    previewContent = `<img src="${previewUrl}" alt="Attached file">`;
+                } else {
+                    previewContent = `<div class="message-file-preview-icon">${fileInfo.icon}</div>`;
+                }
+
+                filePreviewHTML = `
+                    <div class="message-file-preview">
+                        <div class="message-file-preview-card">
+                            ${previewContent}
+                            <div class="message-file-preview-badge">${extension}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
             messageEl.innerHTML = `
                 <div class="message-avatar">${avatar}</div>
                 <div class="message-content">
                     <div class="message-role">${role}</div>
+                    ${filePreviewHTML}
                     <div class="message-text">${this.formatMessageContent(message.content)}</div>
                 </div>
             `;

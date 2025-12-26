@@ -64,6 +64,11 @@
                         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                     </svg>
                 </button>
+                <button id="streamSpeedButton" class="icon-button" title="Streaming Speed">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </button>
                 <button id="settingsButton" class="icon-button" title="Settings">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
@@ -79,6 +84,31 @@
                 </button>
             </div>
         </header>
+
+        <!-- Stream Speed Menu -->
+        <div id="streamSpeedMenu" class="speed-menu" style="display: none;">
+            <div class="speed-menu-header">Streaming Speed</div>
+            <button class="speed-option" data-speed="slow">
+                <span class="speed-icon">🐢</span>
+                <span class="speed-label">Slow</span>
+                <span class="speed-desc">~12 words/sec</span>
+            </button>
+            <button class="speed-option" data-speed="normal">
+                <span class="speed-icon">⚡</span>
+                <span class="speed-label">Normal</span>
+                <span class="speed-desc">~25 words/sec</span>
+            </button>
+            <button class="speed-option" data-speed="fast">
+                <span class="speed-icon">🚀</span>
+                <span class="speed-label">Fast</span>
+                <span class="speed-desc">~65 words/sec</span>
+            </button>
+            <button class="speed-option" data-speed="instant">
+                <span class="speed-icon">⚡⚡</span>
+                <span class="speed-label">Instant</span>
+                <span class="speed-desc">No delay</span>
+            </button>
+        </div>
 
         <!-- Main Area -->
         <div class="main-area">
