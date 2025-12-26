@@ -904,6 +904,25 @@ class NOXApp {
 
             console.log('✅ Extracted reply text:', replyText);
 
+            // Check for empty or null responses
+            const cleanedReply = replyText.trim();
+            if (!cleanedReply ||
+                cleanedReply === 'null' ||
+                cleanedReply === 'undefined' ||
+                cleanedReply === '{}' ||
+                cleanedReply === '[]' ||
+                cleanedReply.match(/^{.*"message":\s*null.*}$/)) {
+
+                // Display friendly error from NOX
+                const errorMessage = {
+                    role: 'assistant',
+                    content: "I apologize, but I received an empty response from the workflow. This might be a configuration issue. Please check your n8n workflow to ensure it's returning a proper response."
+                };
+                await this.displayMessageWithStreaming(errorMessage);
+                chatManager.addMessage(errorMessage);
+                return;
+            }
+
             // Display response with streaming effect
             const assistantMessage = {
                 role: 'assistant',
@@ -916,11 +935,16 @@ class NOXApp {
 
         } catch (error) {
             this.removeMessage(loadingId);
+
+            // Generate friendly error message from NOX
+            const friendlyError = this.getFriendlyErrorMessage(error);
+
             const errorMessage = {
-                role: 'system',
-                content: `❌ ${this.formatError(error)}`
+                role: 'assistant',
+                content: friendlyError
             };
-            this.displayMessage(errorMessage);
+            await this.displayMessageWithStreaming(errorMessage);
+            chatManager.addMessage(errorMessage);
             console.error('Send message error:', error);
         } finally {
             this.isProcessing = false;
@@ -1685,6 +1709,59 @@ class NOXApp {
     }
 
     // ==================== Utilities ====================
+
+    /**
+     * Get user-friendly error message from NOX's perspective
+     */
+    getFriendlyErrorMessage(error) {
+        // Handle timeout errors
+        if (error.name === 'AbortError' ||
+            (error.message && error.message.includes('timeout'))) {
+            return "I apologize, but the request timed out after 5 minutes. This might be a complex query or your workflow might be taking longer than expected. Please try again with a simpler request or check your n8n workflow.";
+        }
+
+        // Handle network/connection errors
+        if (error.message && (
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('NetworkError') ||
+            error.message.includes('network'))) {
+            return "I'm having trouble connecting to the n8n workflow. Please check your network connection and ensure the webhook URL is accessible.";
+        }
+
+        // Handle HTTP 500 errors
+        if (error.message && error.message.includes('500')) {
+            return "I encountered an internal server error (HTTP 500). This usually means there's an issue with your n8n workflow configuration. Please check the workflow for errors.";
+        }
+
+        // Handle HTTP 404 errors
+        if (error.message && error.message.includes('404')) {
+            return "The workflow endpoint could not be found (HTTP 404). Please verify your webhook URL in the settings.";
+        }
+
+        // Handle HTTP 401/403 errors
+        if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
+            return "Authentication failed (HTTP 401/403). Please check your API key in the settings.";
+        }
+
+        // Handle configuration errors
+        if (error.message && error.message.includes('not configured')) {
+            return "The n8n webhook is not configured. Please set up your webhook URL in the settings.";
+        }
+
+        // Handle generic webhook errors
+        if (error.message && error.message.includes('Webhook request failed')) {
+            const match = error.message.match(/(\d{3})/);
+            const statusCode = match ? match[1] : 'Unknown';
+            return `I received an error response from the workflow (HTTP ${statusCode}). Please check your n8n workflow for issues.`;
+        }
+
+        // Default fallback - extract meaningful message
+        if (error.message) {
+            return `I encountered an error: ${error.message}. Please try again or check your workflow configuration.`;
+        }
+
+        return "I encountered an unexpected error. Please try again. If the problem persists, please check your n8n workflow configuration.";
+    }
 
     /**
      * Format error messages for user display
