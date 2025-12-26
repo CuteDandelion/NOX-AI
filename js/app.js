@@ -206,6 +206,16 @@ class NOXApp {
         });
     }
 
+    isNearBottom() {
+        // Check if user is within 100px of bottom
+        const threshold = 100;
+        const scrollTop = this.chatMessages.scrollTop;
+        const scrollHeight = this.chatMessages.scrollHeight;
+        const clientHeight = this.chatMessages.clientHeight;
+
+        return (scrollHeight - scrollTop - clientHeight) < threshold;
+    }
+
     scrollToBottom(smooth = false) {
         if (smooth) {
             this.chatMessages.scrollTo({
@@ -1163,6 +1173,11 @@ class NOXApp {
 
             // Format and display
             container.innerHTML = this.formatMessageContent(displayText);
+
+            // Auto-scroll during streaming (only if user is near bottom)
+            if (this.isNearBottom()) {
+                this.scrollToBottom();
+            }
 
             // Delay between words (configurable speed)
             const delay = this.streamingSpeedOptions[this.currentStreamingSpeed] || 40;
