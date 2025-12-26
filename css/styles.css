@@ -118,6 +118,92 @@ body {
 }
 
 /* ====================================
+   Stream Speed Menu
+   ==================================== */
+.speed-menu {
+    position: absolute;
+    top: 70px;
+    right: 150px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 220px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.speed-menu-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+}
+
+.speed-option {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-primary);
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.speed-option:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-primary);
+}
+
+.speed-option.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.speed-icon {
+    font-size: 18px;
+    width: 24px;
+    flex-shrink: 0;
+}
+
+.speed-label {
+    flex: 1;
+    font-weight: 500;
+    text-align: left;
+}
+
+.speed-desc {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    opacity: 0.8;
+}
+
+.speed-option.active .speed-desc {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* ====================================
    Main Area
    ==================================== */
 .main-area {
@@ -240,6 +326,29 @@ body {
     }
 }
 
+/* Gentle floating animation for chat bubbles */
+@keyframes floatBubble {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-3px); /* Gentle 3px upward float */
+    }
+}
+
+/* Stagger floating animation for different messages */
+.message:nth-child(2n) .message-text {
+    animation-delay: -2s; /* Offset animation timing */
+}
+
+.message:nth-child(3n) .message-text {
+    animation-delay: -4s;
+}
+
+.message:nth-child(5n) .message-text {
+    animation-duration: 7s; /* Slightly different speed */
+}
+
 .message-avatar {
     width: 40px;
     height: 40px;
@@ -267,11 +376,11 @@ body {
 }
 
 .message-text {
-    font-size: 16px;
+    font-size: 18px; /* Increased from 16px */
     line-height: 1.7;
     color: var(--text-primary);
     background: rgba(25, 30, 45, 0.85); /* More opaque for readability */
-    padding: 18px 24px;
+    padding: 24px 32px; /* Increased from 18px 24px (~30% larger) */
     border-radius: 24px; /* More rounded */
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.6), /* Stronger shadow */
@@ -282,6 +391,7 @@ body {
     border: 1.5px solid rgba(124, 58, 237, 0.3); /* Purple border */
     border-left: 4px solid rgba(124, 58, 237, 0.6); /* Accent stripe */
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* Text depth */
+    animation: floatBubble 6s ease-in-out infinite; /* Gentle floating animation */
 }
 
 /* User message styling */
@@ -318,6 +428,52 @@ body {
         0 0 20px rgba(167, 139, 250, 0.2), /* Purple glow */
         inset 0 1px 0 rgba(255, 255, 255, 0.2); /* Inner highlight */
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); /* Stronger text shadow */
+}
+
+/* File Preview in Chat Bubble */
+.message-file-preview {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.message-file-preview-card {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.message-file-preview-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.message-file-preview-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.message-file-preview-badge {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    font-size: 7px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
 }
 
 /* Assistant message styling */
@@ -591,6 +747,23 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 32px;
+}
+
+/* File Type Badge in Bottom-Left */
+.file-type-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    z-index: 5;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* Remove Button in Top-Right */

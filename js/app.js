@@ -19,6 +19,7 @@ class NOXApp {
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.files = [];
+        this.currentFilePreviewData = null; // Store file preview info for chat display
 
         // Workflow monitoring
         this.workflowSelect = null;
@@ -65,6 +66,15 @@ class NOXApp {
         // Streaming state
         this.currentStreamController = null;
 
+        // Streaming speed settings
+        this.streamingSpeedOptions = {
+            slow: 80,      // 80ms/word (~12 words/sec)
+            normal: 40,    // 40ms/word (~25 words/sec)
+            fast: 15,      // 15ms/word (~65 words/sec)
+            instant: 0     // 0ms - immediate display
+        };
+        this.currentStreamingSpeed = localStorage.getItem('streaming-speed') || 'normal';
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -97,6 +107,9 @@ class NOXApp {
 
         // Reset Chat
         document.getElementById('resetChatBtn').addEventListener('click', () => this.resetChat());
+
+        // Streaming Speed
+        this.setupStreamingSpeed();
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -477,6 +490,60 @@ class NOXApp {
         }
     }
 
+    // ==================== Streaming Speed ====================
+
+    setupStreamingSpeed() {
+        const speedButton = document.getElementById('streamSpeedButton');
+        const speedMenu = document.getElementById('streamSpeedMenu');
+        const speedOptions = speedMenu.querySelectorAll('.speed-option');
+
+        // Update active state on load
+        this.updateSpeedMenuActive();
+
+        // Toggle menu on button click
+        speedButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = speedMenu.style.display === 'block';
+            speedMenu.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Speed option selection
+        speedOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const speed = option.dataset.speed;
+                this.setStreamingSpeed(speed);
+                speedMenu.style.display = 'none';
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!speedButton.contains(e.target) && !speedMenu.contains(e.target)) {
+                speedMenu.style.display = 'none';
+            }
+        });
+    }
+
+    setStreamingSpeed(speed) {
+        if (this.streamingSpeedOptions[speed] !== undefined) {
+            this.currentStreamingSpeed = speed;
+            localStorage.setItem('streaming-speed', speed);
+            this.updateSpeedMenuActive();
+            console.log(`✨ Streaming speed set to: ${speed} (${this.streamingSpeedOptions[speed]}ms/word)`);
+        }
+    }
+
+    updateSpeedMenuActive() {
+        const speedOptions = document.querySelectorAll('.speed-option');
+        speedOptions.forEach(option => {
+            if (option.dataset.speed === this.currentStreamingSpeed) {
+                option.classList.add('active');
+            } else {
+                option.classList.remove('active');
+            }
+        });
+    }
+
     // ==================== Chat Management ====================
 
 
@@ -682,6 +749,16 @@ class NOXApp {
         // Create tooltip text: "filename (size)"
         const tooltip = `${file.name} (${this.formatFileSize(file.size)})`;
 
+        // Get file extension for badge
+        const extension = file.name.split('.').pop().toUpperCase();
+
+        // Store preview data for chat bubble display
+        this.currentFilePreviewData = {
+            previewUrl: previewUrl,
+            fileInfo: fileInfo,
+            extension: extension
+        };
+
         let previewContent = '';
         if (previewUrl && fileInfo.category === 'image') {
             // Image thumbnail
@@ -700,6 +777,7 @@ class NOXApp {
         this.attachedFiles.innerHTML = `
             <div class="file-preview-card" data-tooltip="${this.escapeHtml(tooltip)}">
                 ${previewContent}
+                <div class="file-type-badge">${extension}</div>
                 <button class="file-preview-remove" id="removeFilePreview">×</button>
             </div>
         `;
@@ -843,7 +921,8 @@ class NOXApp {
         const userMessage = {
             role: 'user',
             content: message,
-            files: this.files.map(f => ({ name: f.name, type: f.type, size: f.size }))
+            files: this.files.map(f => ({ name: f.name, type: f.type, size: f.size })),
+            filePreview: this.currentFilePreviewData // Include preview data
         };
 
         // Display user message
@@ -857,6 +936,7 @@ class NOXApp {
         // Prepare files for upload
         const filesToSend = [...this.files];
         this.files = [];
+        this.currentFilePreviewData = null; // Clear preview data
         this.renderAttachedFiles();
 
         // Set processing state
@@ -904,6 +984,25 @@ class NOXApp {
 
             console.log('✅ Extracted reply text:', replyText);
 
+            // Check for empty or null responses
+            const cleanedReply = replyText.trim();
+            if (!cleanedReply ||
+                cleanedReply === 'null' ||
+                cleanedReply === 'undefined' ||
+                cleanedReply === '{}' ||
+                cleanedReply === '[]' ||
+                cleanedReply.match(/^{.*"message":\s*null.*}$/)) {
+
+                // Display friendly error from NOX
+                const errorMessage = {
+                    role: 'assistant',
+                    content: "I apologize, but I received an empty response from the workflow. This might be a configuration issue. Please check your n8n workflow to ensure it's returning a proper response."
+                };
+                await this.displayMessageWithStreaming(errorMessage);
+                chatManager.addMessage(errorMessage);
+                return;
+            }
+
             // Display response with streaming effect
             const assistantMessage = {
                 role: 'assistant',
@@ -916,11 +1015,16 @@ class NOXApp {
 
         } catch (error) {
             this.removeMessage(loadingId);
+
+            // Generate friendly error message from NOX
+            const friendlyError = this.getFriendlyErrorMessage(error);
+
             const errorMessage = {
-                role: 'system',
-                content: `❌ ${this.formatError(error)}`
+                role: 'assistant',
+                content: friendlyError
             };
-            this.displayMessage(errorMessage);
+            await this.displayMessageWithStreaming(errorMessage);
+            chatManager.addMessage(errorMessage);
             console.error('Send message error:', error);
         } finally {
             this.isProcessing = false;
@@ -1060,8 +1164,11 @@ class NOXApp {
             // Format and display
             container.innerHTML = this.formatMessageContent(displayText);
 
-            // Delay between words (40ms = ~25 words per second)
-            await new Promise(resolve => setTimeout(resolve, 40));
+            // Delay between words (configurable speed)
+            const delay = this.streamingSpeedOptions[this.currentStreamingSpeed] || 40;
+            if (delay > 0) {
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
         }
 
         // Final display with all content
@@ -1099,10 +1206,33 @@ class NOXApp {
             const avatar = this.getAvatarHTML(message.role);
             const role = message.role === 'user' ? 'You' : 'NOX.AI';
 
+            // Generate file preview HTML if present
+            let filePreviewHTML = '';
+            if (message.filePreview && message.role === 'user') {
+                const { previewUrl, fileInfo, extension } = message.filePreview;
+
+                let previewContent = '';
+                if (previewUrl && fileInfo.category === 'image') {
+                    previewContent = `<img src="${previewUrl}" alt="Attached file">`;
+                } else {
+                    previewContent = `<div class="message-file-preview-icon">${fileInfo.icon}</div>`;
+                }
+
+                filePreviewHTML = `
+                    <div class="message-file-preview">
+                        <div class="message-file-preview-card">
+                            ${previewContent}
+                            <div class="message-file-preview-badge">${extension}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
             messageEl.innerHTML = `
                 <div class="message-avatar">${avatar}</div>
                 <div class="message-content">
                     <div class="message-role">${role}</div>
+                    ${filePreviewHTML}
                     <div class="message-text">${this.formatMessageContent(message.content)}</div>
                 </div>
             `;
@@ -1685,6 +1815,59 @@ class NOXApp {
     }
 
     // ==================== Utilities ====================
+
+    /**
+     * Get user-friendly error message from NOX's perspective
+     */
+    getFriendlyErrorMessage(error) {
+        // Handle timeout errors
+        if (error.name === 'AbortError' ||
+            (error.message && error.message.includes('timeout'))) {
+            return "I apologize, but the request timed out after 5 minutes. This might be a complex query or your workflow might be taking longer than expected. Please try again with a simpler request or check your n8n workflow.";
+        }
+
+        // Handle network/connection errors
+        if (error.message && (
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('NetworkError') ||
+            error.message.includes('network'))) {
+            return "I'm having trouble connecting to the n8n workflow. Please check your network connection and ensure the webhook URL is accessible.";
+        }
+
+        // Handle HTTP 500 errors
+        if (error.message && error.message.includes('500')) {
+            return "I encountered an internal server error (HTTP 500). This usually means there's an issue with your n8n workflow configuration. Please check the workflow for errors.";
+        }
+
+        // Handle HTTP 404 errors
+        if (error.message && error.message.includes('404')) {
+            return "The workflow endpoint could not be found (HTTP 404). Please verify your webhook URL in the settings.";
+        }
+
+        // Handle HTTP 401/403 errors
+        if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
+            return "Authentication failed (HTTP 401/403). Please check your API key in the settings.";
+        }
+
+        // Handle configuration errors
+        if (error.message && error.message.includes('not configured')) {
+            return "The n8n webhook is not configured. Please set up your webhook URL in the settings.";
+        }
+
+        // Handle generic webhook errors
+        if (error.message && error.message.includes('Webhook request failed')) {
+            const match = error.message.match(/(\d{3})/);
+            const statusCode = match ? match[1] : 'Unknown';
+            return `I received an error response from the workflow (HTTP ${statusCode}). Please check your n8n workflow for issues.`;
+        }
+
+        // Default fallback - extract meaningful message
+        if (error.message) {
+            return `I encountered an error: ${error.message}. Please try again or check your workflow configuration.`;
+        }
+
+        return "I encountered an unexpected error. Please try again. If the problem persists, please check your n8n workflow configuration.";
+    }
 
     /**
      * Format error messages for user display
