@@ -430,7 +430,6 @@ body {
 }
 
 .message-content {
-    flex: 1;
     max-width: 75%;
 }
 
@@ -752,8 +751,11 @@ body {
    ==================================== */
 .attached-files {
     display: none;
-    margin-right: 8px;
-    align-self: flex-end;
+    position: absolute;
+    bottom: 100%;
+    left: 48px;
+    margin-bottom: 8px;
+    z-index: 10;
 }
 
 /* Compact File Preview Card (80x80px) */
@@ -1040,6 +1042,7 @@ body {
 
 /* Chat Input */
 .chat-input-container {
+    position: relative;
     padding: 16px 20px;
     border-top: 1px solid var(--border-color);
     background: var(--bg-primary);
