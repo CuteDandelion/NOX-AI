@@ -88,6 +88,17 @@ class NOXApp {
         this.skillSelectorSearchQuery = '';
         this.currentWizardSkill = null;
 
+        // Initialize Autocomplete
+        this.recentQueries = this.loadRecentQueries();
+        this.slashCommands = [
+            { command: '/create-skill', description: 'Create a new skill via chat' },
+            { command: '/list-skills', description: 'List all available skills' },
+            { command: '/export-chat', description: 'Export current conversation' },
+            { command: '/use-skill', description: 'Use a skill for prompting' }
+        ];
+        this.autocompleteIndex = -1;
+        this.autocompleteSuggestions = [];
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -132,6 +143,9 @@ class NOXApp {
 
         // Skill-Based Prompting
         this.setupSkillPrompting();
+
+        // Autocomplete
+        this.setupAutocomplete();
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -1355,6 +1369,337 @@ class NOXApp {
         });
     }
 
+    // ==================== Autocomplete ====================
+
+    setupAutocomplete() {
+        const chatInput = document.getElementById('chatInput');
+        const autocompleteDropdown = document.getElementById('autocompleteDropdown');
+
+        // Show autocomplete on input
+        chatInput.addEventListener('input', (e) => {
+            this.handleAutocompleteInput(e.target.value);
+        });
+
+        // Handle keyboard navigation
+        chatInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById('autocompleteDropdown');
+            if (dropdown.style.display === 'none') return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.navigateAutocomplete(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.navigateAutocomplete(-1);
+            } else if (e.key === 'Enter' && this.autocompleteIndex >= 0) {
+                e.preventDefault();
+                this.selectAutocompleteSuggestion(this.autocompleteSuggestions[this.autocompleteIndex]);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.hideAutocomplete();
+            }
+        });
+
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!chatInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
+                this.hideAutocomplete();
+            }
+        });
+
+        // Load skills for trigger detection
+        this.loadSkillsForAutocomplete();
+    }
+
+    async loadSkillsForAutocomplete() {
+        try {
+            if (this.skillLibraryManager.skills.length === 0) {
+                await this.skillLibraryManager.loadSkills();
+            }
+        } catch (error) {
+            console.error('Failed to load skills for autocomplete:', error);
+        }
+    }
+
+    handleAutocompleteInput(value) {
+        if (!value || value.trim() === '') {
+            this.hideAutocomplete();
+            return;
+        }
+
+        const suggestions = [];
+
+        // Check for slash commands
+        if (value.startsWith('/')) {
+            const matchingCommands = this.slashCommands.filter(cmd =>
+                cmd.command.startsWith(value.toLowerCase())
+            );
+
+            matchingCommands.forEach(cmd => {
+                suggestions.push({
+                    type: 'command',
+                    icon: '⚡',
+                    title: cmd.command,
+                    description: cmd.description,
+                    value: cmd.command
+                });
+            });
+        }
+
+        // Check for skill triggers
+        const lowerValue = value.toLowerCase();
+        const matchingSkills = this.skillLibraryManager.skills.filter(skill => {
+            if (!skill.triggers) return false;
+            return skill.triggers.some(trigger =>
+                trigger.toLowerCase().includes(lowerValue) ||
+                lowerValue.includes(trigger.toLowerCase())
+            );
+        });
+
+        matchingSkills.slice(0, 5).forEach(skill => {
+            suggestions.push({
+                type: 'skill',
+                icon: '🎯',
+                title: skill.name,
+                description: skill.description,
+                value: skill,
+                isSkill: true
+            });
+        });
+
+        // Check for recent queries
+        const matchingQueries = this.recentQueries.filter(query =>
+            query.toLowerCase().includes(lowerValue)
+        );
+
+        matchingQueries.slice(0, 5).forEach(query => {
+            suggestions.push({
+                type: 'recent',
+                icon: '🕐',
+                title: query,
+                description: 'Recent query',
+                value: query
+            });
+        });
+
+        if (suggestions.length > 0) {
+            this.showAutocomplete(suggestions);
+        } else {
+            this.hideAutocomplete();
+        }
+    }
+
+    showAutocomplete(suggestions) {
+        this.autocompleteSuggestions = suggestions;
+        this.autocompleteIndex = -1;
+
+        const dropdown = document.getElementById('autocompleteDropdown');
+        dropdown.innerHTML = '';
+
+        // Group suggestions by type
+        const commandSuggestions = suggestions.filter(s => s.type === 'command');
+        const skillSuggestions = suggestions.filter(s => s.type === 'skill');
+        const recentSuggestions = suggestions.filter(s => s.type === 'recent');
+
+        // Add slash commands section
+        if (commandSuggestions.length > 0) {
+            const section = this.createAutocompleteSection('Commands', commandSuggestions);
+            dropdown.appendChild(section);
+        }
+
+        // Add skills section
+        if (skillSuggestions.length > 0) {
+            if (commandSuggestions.length > 0) {
+                const separator = document.createElement('div');
+                separator.className = 'autocomplete-separator';
+                dropdown.appendChild(separator);
+            }
+
+            const section = this.createAutocompleteSection('Skills', skillSuggestions);
+            dropdown.appendChild(section);
+        }
+
+        // Add recent queries section
+        if (recentSuggestions.length > 0) {
+            if (commandSuggestions.length > 0 || skillSuggestions.length > 0) {
+                const separator = document.createElement('div');
+                separator.className = 'autocomplete-separator';
+                dropdown.appendChild(separator);
+            }
+
+            const section = this.createAutocompleteSection('Recent Queries', recentSuggestions);
+            dropdown.appendChild(section);
+        }
+
+        dropdown.style.display = 'block';
+    }
+
+    createAutocompleteSection(title, suggestions) {
+        const section = document.createElement('div');
+        section.className = 'autocomplete-section';
+
+        const header = document.createElement('div');
+        header.className = 'autocomplete-section-header';
+        header.textContent = title;
+        section.appendChild(header);
+
+        suggestions.forEach((suggestion, index) => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.dataset.index = this.autocompleteSuggestions.indexOf(suggestion);
+
+            const icon = document.createElement('div');
+            icon.className = 'autocomplete-item-icon';
+            icon.textContent = suggestion.icon;
+
+            const content = document.createElement('div');
+            content.className = 'autocomplete-item-content';
+
+            const titleEl = document.createElement('div');
+            titleEl.className = 'autocomplete-item-title';
+            titleEl.textContent = suggestion.title;
+
+            const descEl = document.createElement('div');
+            descEl.className = 'autocomplete-item-desc';
+            descEl.textContent = suggestion.description;
+
+            content.appendChild(titleEl);
+            content.appendChild(descEl);
+
+            item.appendChild(icon);
+            item.appendChild(content);
+
+            item.addEventListener('click', () => {
+                this.selectAutocompleteSuggestion(suggestion);
+            });
+
+            section.appendChild(item);
+        });
+
+        return section;
+    }
+
+    navigateAutocomplete(direction) {
+        const items = document.querySelectorAll('.autocomplete-item');
+        if (items.length === 0) return;
+
+        // Remove active class from current item
+        if (this.autocompleteIndex >= 0 && this.autocompleteIndex < items.length) {
+            items[this.autocompleteIndex].classList.remove('active');
+        }
+
+        // Update index
+        this.autocompleteIndex += direction;
+
+        // Wrap around
+        if (this.autocompleteIndex < 0) {
+            this.autocompleteIndex = items.length - 1;
+        } else if (this.autocompleteIndex >= items.length) {
+            this.autocompleteIndex = 0;
+        }
+
+        // Add active class to new item
+        items[this.autocompleteIndex].classList.add('active');
+
+        // Scroll into view
+        items[this.autocompleteIndex].scrollIntoView({
+            block: 'nearest',
+            behavior: 'smooth'
+        });
+    }
+
+    selectAutocompleteSuggestion(suggestion) {
+        const chatInput = document.getElementById('chatInput');
+
+        if (suggestion.type === 'command') {
+            // Handle slash commands
+            this.handleSlashCommand(suggestion.value);
+        } else if (suggestion.type === 'skill' && suggestion.isSkill) {
+            // Handle skill selection
+            this.selectSkill(suggestion.value);
+        } else {
+            // Insert text suggestion
+            chatInput.value = suggestion.value;
+
+            // Auto-resize textarea
+            chatInput.style.height = 'auto';
+            chatInput.style.height = chatInput.scrollHeight + 'px';
+        }
+
+        this.hideAutocomplete();
+        chatInput.focus();
+    }
+
+    handleSlashCommand(command) {
+        const chatInput = document.getElementById('chatInput');
+
+        switch (command) {
+            case '/create-skill':
+                chatInput.value = 'Create a new skill with the following:\nName: \nDescription: \nCategory: \nTriggers: \nCypher Template: ';
+                break;
+
+            case '/list-skills':
+                chatInput.value = 'List all available skills in the system';
+                break;
+
+            case '/export-chat':
+                // Directly trigger export menu
+                document.getElementById('exportChatButton').click();
+                chatInput.value = '';
+                return;
+
+            case '/use-skill':
+                // Directly trigger skill selector
+                document.getElementById('skillSelectorButton').click();
+                chatInput.value = '';
+                return;
+
+            default:
+                chatInput.value = command + ' ';
+        }
+
+        // Auto-resize textarea
+        chatInput.style.height = 'auto';
+        chatInput.style.height = chatInput.scrollHeight + 'px';
+    }
+
+    hideAutocomplete() {
+        const dropdown = document.getElementById('autocompleteDropdown');
+        dropdown.style.display = 'none';
+        this.autocompleteIndex = -1;
+        this.autocompleteSuggestions = [];
+    }
+
+    loadRecentQueries() {
+        try {
+            const stored = localStorage.getItem('nox-ai-recent-queries');
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error('Failed to load recent queries:', error);
+            return [];
+        }
+    }
+
+    saveRecentQuery(query) {
+        if (!query || query.trim() === '') return;
+
+        // Remove if already exists
+        this.recentQueries = this.recentQueries.filter(q => q !== query);
+
+        // Add to beginning
+        this.recentQueries.unshift(query);
+
+        // Keep only last 20
+        this.recentQueries = this.recentQueries.slice(0, 20);
+
+        // Save to localStorage
+        try {
+            localStorage.setItem('nox-ai-recent-queries', JSON.stringify(this.recentQueries));
+        } catch (error) {
+            console.error('Failed to save recent queries:', error);
+        }
+    }
+
     // ==================== Chat Management ====================
 
 
@@ -1739,6 +2084,11 @@ class NOXApp {
         // Display user message
         this.displayMessage(userMessage);
         chatManager.addMessage(userMessage);
+
+        // Save to recent queries
+        if (message) {
+            this.saveRecentQuery(message);
+        }
 
         // Clear input
         this.chatInput.value = '';
