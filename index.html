@@ -499,6 +499,163 @@
         <div class="window-resize-handle"></div>
     </div>
 
+    <!-- Skills Library Floating Window -->
+    <div id="skillsLibraryWindow" class="floating-window hidden">
+        <div class="floating-window-header">
+            <div class="window-title-bar">
+                <h3 class="window-title">Skills Library</h3>
+                <div class="window-controls">
+                    <button id="minimizeSkillsWindow" class="window-control-btn" title="Minimize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                    <button id="maximizeSkillsWindow" class="window-control-btn" title="Maximize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        </svg>
+                    </button>
+                    <button id="closeSkillsLibrary" class="window-control-btn close" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="floating-window-body">
+            <!-- Skills Library Controls -->
+            <div class="skills-library-controls">
+                <div class="skills-search-row">
+                    <div class="form-group" style="flex: 1; margin-right: 12px;">
+                        <label for="skillsSearch">Search:</label>
+                        <input
+                            type="text"
+                            id="skillsSearch"
+                            class="skills-search-input"
+                            placeholder="Search by name, description, or trigger..."
+                            autocomplete="off"
+                        />
+                    </div>
+                    <div class="form-group" style="width: 200px; margin-right: 12px;">
+                        <label for="skillsCategoryFilter">Category:</label>
+                        <select id="skillsCategoryFilter" class="skills-category-select">
+                            <option value="all">All Categories</option>
+                        </select>
+                    </div>
+                    <button id="refreshSkills" class="btn-secondary" title="Reload Skills">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Skills Stats -->
+                <div class="skills-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Skills:</span>
+                        <span class="stat-value" id="totalSkillsCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Usage:</span>
+                        <span class="stat-value" id="totalUsageCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Categories:</span>
+                        <span class="stat-value" id="categoriesCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skills List -->
+            <div id="skillsList" class="skills-list">
+                <div class="skills-placeholder">
+                    <p>Loading skills from Neo4j...</p>
+                </div>
+            </div>
+
+            <div id="skillsStatus" class="skills-status">
+                Click "Refresh" to load skills from Neo4j.
+            </div>
+        </div>
+
+        <!-- Resize handle -->
+        <div class="window-resize-handle"></div>
+    </div>
+
+    <!-- Edit Skill Modal -->
+    <div id="editSkillModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Skill</h3>
+                <button id="closeEditModal" class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="editSkillName">Name:</label>
+                    <input type="text" id="editSkillName" class="modal-input" />
+                </div>
+                <div class="form-group">
+                    <label for="editSkillDescription">Description:</label>
+                    <textarea id="editSkillDescription" class="modal-textarea" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editSkillCategory">Category:</label>
+                    <input type="text" id="editSkillCategory" class="modal-input" />
+                </div>
+                <div class="form-group">
+                    <label for="editSkillTriggers">Triggers (comma-separated):</label>
+                    <input type="text" id="editSkillTriggers" class="modal-input" placeholder="trigger1, trigger2, trigger3" />
+                </div>
+                <div class="form-group">
+                    <label for="editSkillCypher">Cypher Template:</label>
+                    <textarea id="editSkillCypher" class="modal-textarea code-editor" rows="8" spellcheck="false"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editSkillParameters">Parameters (JSON):</label>
+                    <textarea id="editSkillParameters" class="modal-textarea code-editor" rows="4" spellcheck="false"></textarea>
+                </div>
+                <div id="editSkillErrors" class="modal-errors" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelEditSkill" class="btn-secondary">Cancel</button>
+                <button id="saveEditSkill" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Skill Confirmation Modal -->
+    <div id="deleteSkillModal" class="modal hidden">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Delete Skill</h3>
+                <button id="closeDeleteModal" class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteSkillMessage">Are you sure you want to delete this skill?</p>
+                <p style="margin-top: 8px; color: var(--text-secondary); font-size: 13px;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelDeleteSkill" class="btn-secondary">Cancel</button>
+                <button id="confirmDeleteSkill" class="btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Marked.js for markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
@@ -521,6 +678,7 @@
     <script src="/nox/js/neo4j-manager.js"></script>
     <script src="/nox/js/chat-manager.js"></script>
     <script src="/nox/js/chat-exporter.js"></script>
+    <script src="/nox/js/skill-library-manager.js"></script>
     <script src="/nox/js/app.js"></script>
 </body>
 </html>
