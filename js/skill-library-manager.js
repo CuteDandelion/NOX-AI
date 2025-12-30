@@ -25,9 +25,20 @@ class SkillLibraryManager {
 
             const result = await this.neo4jManager.executeQuery(query);
 
-            if (result && result.length > 0) {
-                this.skills = result.map(record => record.s.properties);
-                return this.skills;
+            // Parse Neo4j response structure
+            if (result && result.results && result.results.length > 0) {
+                const statement = result.results[0];
+
+                if (statement.data && statement.data.length > 0) {
+                    this.skills = statement.data.map(record => {
+                        // Get the node from the row (first element since we RETURN s)
+                        const node = record.row[0];
+                        return node; // Return the entire node object which includes properties
+                    });
+
+                    console.log('Loaded skills:', this.skills.length);
+                    return this.skills;
+                }
             }
 
             this.skills = [];
@@ -128,10 +139,15 @@ class SkillLibraryManager {
 
             const result = await this.neo4jManager.executeQuery(query, params);
 
-            if (result && result.length > 0) {
-                // Reload skills to update local cache
-                await this.loadSkills();
-                return result[0].s.properties;
+            // Parse Neo4j response
+            if (result && result.results && result.results.length > 0) {
+                const statement = result.results[0];
+                if (statement.data && statement.data.length > 0) {
+                    // Reload skills to update local cache
+                    await this.loadSkills();
+                    const updatedSkill = statement.data[0].row[0];
+                    return updatedSkill;
+                }
             }
 
             throw new Error('Failed to update skill');
@@ -154,10 +170,17 @@ class SkillLibraryManager {
 
             const result = await this.neo4jManager.executeQuery(query, { id });
 
-            if (result && result[0]?.deleted > 0) {
-                // Reload skills to update local cache
-                await this.loadSkills();
-                return true;
+            // Parse Neo4j response
+            if (result && result.results && result.results.length > 0) {
+                const statement = result.results[0];
+                if (statement.data && statement.data.length > 0) {
+                    const deletedCount = statement.data[0].row[0];
+                    if (deletedCount > 0) {
+                        // Reload skills to update local cache
+                        await this.loadSkills();
+                        return true;
+                    }
+                }
             }
 
             return false;
