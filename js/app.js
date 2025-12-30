@@ -595,6 +595,12 @@ class NOXApp {
     setupExportChat() {
         const exportButton = document.getElementById('exportChatButton');
         const exportMenu = document.getElementById('exportChatMenu');
+
+        if (!exportButton || !exportMenu) {
+            console.warn('Export chat elements not found, skipping setup');
+            return;
+        }
+
         const exportOptions = exportMenu.querySelectorAll('.export-option');
 
         // Toggle menu on button click
@@ -615,7 +621,8 @@ class NOXApp {
 
         // Close menu when clicking outside
         document.addEventListener('click', (e) => {
-            if (!exportButton.contains(e.target) && !exportMenu.contains(e.target)) {
+            if (exportButton && exportMenu &&
+                !exportButton.contains(e.target) && !exportMenu.contains(e.target)) {
                 exportMenu.style.display = 'none';
             }
         });
@@ -1033,6 +1040,11 @@ class NOXApp {
         const skillSelectorMenu = document.getElementById('skillSelectorMenu');
         const skillSelectorSearch = document.getElementById('skillSelectorSearch');
 
+        if (!skillSelectorButton || !skillSelectorMenu || !skillSelectorSearch) {
+            console.warn('Skill prompting elements not found, skipping setup');
+            return;
+        }
+
         // Toggle skill selector menu
         skillSelectorButton.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1052,7 +1064,8 @@ class NOXApp {
 
         // Close menu when clicking outside
         document.addEventListener('click', (e) => {
-            if (!skillSelectorButton.contains(e.target) && !skillSelectorMenu.contains(e.target)) {
+            if (skillSelectorButton && skillSelectorMenu &&
+                !skillSelectorButton.contains(e.target) && !skillSelectorMenu.contains(e.target)) {
                 skillSelectorMenu.style.display = 'none';
             }
         });
@@ -1375,6 +1388,11 @@ class NOXApp {
         const chatInput = document.getElementById('chatInput');
         const autocompleteDropdown = document.getElementById('autocompleteDropdown');
 
+        if (!chatInput || !autocompleteDropdown) {
+            console.warn('Autocomplete elements not found, skipping setup');
+            return;
+        }
+
         // Show autocomplete on input
         chatInput.addEventListener('input', (e) => {
             this.handleAutocompleteInput(e.target.value);
@@ -1383,7 +1401,7 @@ class NOXApp {
         // Handle keyboard navigation
         chatInput.addEventListener('keydown', (e) => {
             const dropdown = document.getElementById('autocompleteDropdown');
-            if (dropdown.style.display === 'none') return;
+            if (!dropdown || dropdown.style.display === 'none') return;
 
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -1402,7 +1420,8 @@ class NOXApp {
 
         // Hide autocomplete when clicking outside
         document.addEventListener('click', (e) => {
-            if (!chatInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
+            if (chatInput && autocompleteDropdown &&
+                !chatInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
                 this.hideAutocomplete();
             }
         });
