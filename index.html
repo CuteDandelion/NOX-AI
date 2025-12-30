@@ -163,17 +163,20 @@
             </div>
         </div>
 
-        <!-- Autocomplete Dropdown -->
-        <div id="autocompleteDropdown" class="autocomplete-dropdown" style="display: none;">
-            <!-- Autocomplete suggestions will be dynamically inserted here -->
-        </div>
-
         <!-- Main Area -->
         <div class="main-area">
                 <!-- Chat Section -->
                 <div class="chat-section">
                     <div id="chatMessages" class="chat-messages">
                         <!-- Messages will be inserted here -->
+                    </div>
+
+                    <!-- Welcome Screen (shown when chat is empty) -->
+                    <div id="welcomeScreen" class="welcome-screen">
+                        <div class="welcome-content">
+                            <h1 class="welcome-title">Welcome, Admin</h1>
+                            <p class="welcome-subtitle">What can I do for you?</p>
+                        </div>
                     </div>
 
                     <!-- Scroll to Bottom Button -->
@@ -199,19 +202,22 @@
                             </button>
                             <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.html,.md,.json,.csv" style="display: none;">
                         </div>
-                        <textarea
-                            id="chatInput"
-                            class="chat-input"
-                            placeholder="Message NOX.AI..."
-                            rows="1"
-                            autocomplete="off"
-                            autocorrect="off"
-                            autocapitalize="off"
-                            spellcheck="false"
-                            data-form-type="other"
-                            data-lpignore="true"
-                            data-1p-ignore="true"
-                        ></textarea>
+                        <div class="chat-input-wrapper">
+                            <textarea
+                                id="chatInput"
+                                class="chat-input"
+                                placeholder="Message NOX.AI..."
+                                rows="1"
+                                autocomplete="off"
+                                autocorrect="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                data-form-type="other"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                            ></textarea>
+                            <div id="inlineGhostText" class="inline-ghost-text"></div>
+                        </div>
                         <div class="input-actions">
                             <button id="skillSelectorButton" class="action-button" title="Use Skill">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -635,28 +641,24 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="editSkillName">Name:</label>
-                    <input type="text" id="editSkillName" class="modal-input" />
-                </div>
-                <div class="form-group">
-                    <label for="editSkillDescription">Description:</label>
-                    <textarea id="editSkillDescription" class="modal-textarea" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="editSkillCategory">Category:</label>
-                    <input type="text" id="editSkillCategory" class="modal-input" />
-                </div>
-                <div class="form-group">
-                    <label for="editSkillTriggers">Triggers (comma-separated):</label>
-                    <input type="text" id="editSkillTriggers" class="modal-input" placeholder="trigger1, trigger2, trigger3" />
-                </div>
-                <div class="form-group">
-                    <label for="editSkillCypher">Cypher Template:</label>
-                    <textarea id="editSkillCypher" class="modal-textarea code-editor" rows="8" spellcheck="false"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="editSkillParameters">Parameters (JSON):</label>
-                    <textarea id="editSkillParameters" class="modal-textarea code-editor" rows="4" spellcheck="false"></textarea>
+                    <div class="json-editor-header">
+                        <label for="editSkillJSON">Edit Skill (JSON)</label>
+                        <button id="revertSkillJSON" class="btn-icon" title="Revert changes">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <textarea
+                        id="editSkillJSON"
+                        class="modal-textarea json-editor"
+                        rows="20"
+                        spellcheck="false"
+                        autocomplete="off"
+                        autocorrect="off"
+                        autocapitalize="off"
+                    ></textarea>
                 </div>
                 <div id="editSkillErrors" class="modal-errors" style="display: none;"></div>
             </div>

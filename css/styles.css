@@ -2772,6 +2772,54 @@ body {
     line-height: 1.5;
 }
 
+/* JSON Editor Styles */
+.json-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.json-editor-header label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: rgba(139, 148, 158, 0.1);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+}
+
+.modal-textarea.json-editor {
+    font-family: 'Courier New', Consolas, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 400px;
+    resize: vertical;
+    tab-size: 2;
+    -moz-tab-size: 2;
+}
+
 .modal-errors {
     background: rgba(255, 107, 107, 0.1);
     border: 1px solid #ff6b6b;
@@ -3040,88 +3088,134 @@ body {
     font-style: italic;
 }
 
-/* ==================== Autocomplete ====================  */
+/* ==================== Welcome Screen ==================== */
 
-.autocomplete-dropdown {
+.welcome-screen {
     position: absolute;
-    bottom: 80px;
-    left: 20px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    width: 400px;
-    max-height: 350px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    animation: slideUp 0.2s ease-out;
-    overflow-y: auto;
-}
-
-.autocomplete-section {
-    padding: 12px;
-}
-
-.autocomplete-section-header {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-    padding: 0 4px;
-}
-
-.autocomplete-item {
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    padding: 10px 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-bottom: 2px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.autocomplete-item:hover,
-.autocomplete-item.active {
-    background: var(--bg-secondary);
-    border-color: var(--accent-primary);
-}
-
-.autocomplete-item-icon {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 1;
 }
 
-.autocomplete-item-content {
-    flex: 1;
-    min-width: 0;
+.welcome-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
 }
 
-.autocomplete-item-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-bottom: 2px;
+.welcome-content {
+    text-align: center;
+    padding: 40px;
 }
 
-.autocomplete-item-desc {
-    font-size: 12px;
+.welcome-title {
+    font-size: 48px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.welcome-subtitle {
+    font-size: 20px;
     color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin: 0;
+    font-weight: 400;
 }
 
-.autocomplete-separator {
-    height: 1px;
-    background: var(--border-color);
-    margin: 8px 0;
+/* Chat Section States */
+.chat-section {
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-input-container {
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Centered State (Initial) */
+.chat-section.centered {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-section.centered .chat-messages {
+    display: none;
+}
+
+.chat-section.centered .chat-input-container {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 800px;
+    z-index: 10;
+}
+
+/* Bottom State (After first message) */
+.chat-section.bottom .welcome-screen {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chat-section.bottom .chat-messages {
+    display: flex;
+}
+
+.chat-section.bottom .chat-input-container {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: none;
+}
+
+/* ==================== Inline Autocomplete (Ghost Text) ====================  */
+
+.chat-input-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+}
+
+.chat-input-wrapper .chat-input {
+    position: relative;
+    z-index: 2;
+    background: transparent;
+}
+
+.inline-ghost-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 1;
+    padding: 14px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow: hidden;
+}
+
+.inline-ghost-text .ghost-suggestion {
+    color: rgba(139, 148, 158, 0.5);
 }
