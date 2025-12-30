@@ -1708,9 +1708,7 @@ class NOXApp {
         const messages = chatManager.getMessages();
         this.chatMessages.innerHTML = '';
 
-        if (messages.length === 0) {
-            this.addSystemMessage('Welcome to NOX.AI. How can I help you today?');
-        } else {
+        if (messages.length > 0) {
             messages.forEach(msg => {
                 this.displayMessage(msg);
             });
