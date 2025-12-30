@@ -75,6 +75,9 @@ class NOXApp {
         };
         this.currentStreamingSpeed = localStorage.getItem('streaming-speed') || 'normal';
 
+        // Initialize Chat Exporter
+        this.chatExporter = new ChatExporter(chatManager);
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -110,6 +113,9 @@ class NOXApp {
 
         // Streaming Speed
         this.setupStreamingSpeed();
+
+        // Export Chat
+        this.setupExportChat();
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -552,6 +558,47 @@ class NOXApp {
                 option.classList.remove('active');
             }
         });
+    }
+
+    // ==================== Export Chat ====================
+
+    setupExportChat() {
+        const exportButton = document.getElementById('exportChatButton');
+        const exportMenu = document.getElementById('exportChatMenu');
+        const exportOptions = exportMenu.querySelectorAll('.export-option');
+
+        // Toggle menu on button click
+        exportButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = exportMenu.style.display === 'block';
+            exportMenu.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Export option selection
+        exportOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const format = option.dataset.format;
+                this.exportChat(format);
+                exportMenu.style.display = 'none';
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!exportButton.contains(e.target) && !exportMenu.contains(e.target)) {
+                exportMenu.style.display = 'none';
+            }
+        });
+    }
+
+    exportChat(format) {
+        try {
+            this.chatExporter.export(format);
+            this.addSystemMessage(`✅ Chat exported as ${format.toUpperCase()}`);
+        } catch (error) {
+            console.error('Export error:', error);
+            this.addSystemMessage(`❌ Export failed: ${error.message}`);
+        }
     }
 
     // ==================== Chat Management ====================

@@ -64,9 +64,23 @@
                         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                     </svg>
                 </button>
+                <button id="skillsLibraryBtn" class="icon-button" title="Skills Library">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </button>
                 <button id="streamSpeedButton" class="icon-button" title="Streaming Speed">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </button>
+                <button id="exportChatButton" class="icon-button" title="Export Conversation">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
                 </button>
                 <button id="settingsButton" class="icon-button" title="Settings">
@@ -107,6 +121,26 @@
                 <span class="speed-icon">⚡⚡</span>
                 <span class="speed-label">Instant</span>
                 <span class="speed-desc">No delay</span>
+            </button>
+        </div>
+
+        <!-- Export Chat Menu -->
+        <div id="exportChatMenu" class="export-menu" style="display: none;">
+            <div class="export-menu-header">Export Conversation</div>
+            <button class="export-option" data-format="json">
+                <span class="export-icon">📄</span>
+                <span class="export-label">JSON</span>
+                <span class="export-desc">With metadata</span>
+            </button>
+            <button class="export-option" data-format="markdown">
+                <span class="export-icon">📝</span>
+                <span class="export-label">Markdown</span>
+                <span class="export-desc">Human-readable</span>
+            </button>
+            <button class="export-option" data-format="html">
+                <span class="export-icon">🌐</span>
+                <span class="export-label">HTML</span>
+                <span class="export-desc">Styled page</span>
             </button>
         </div>
 
@@ -486,6 +520,7 @@
     <script src="/nox/js/n8n.js"></script>
     <script src="/nox/js/neo4j-manager.js"></script>
     <script src="/nox/js/chat-manager.js"></script>
+    <script src="/nox/js/chat-exporter.js"></script>
     <script src="/nox/js/app.js"></script>
 </body>
 </html>
