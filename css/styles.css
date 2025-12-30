@@ -2772,6 +2772,54 @@ body {
     line-height: 1.5;
 }
 
+/* JSON Editor Styles */
+.json-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.json-editor-header label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.btn-icon {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: rgba(139, 148, 158, 0.1);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+}
+
+.modal-textarea.json-editor {
+    font-family: 'Courier New', Consolas, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 400px;
+    resize: vertical;
+    tab-size: 2;
+    -moz-tab-size: 2;
+}
+
 .modal-errors {
     background: rgba(255, 107, 107, 0.1);
     border: 1px solid #ff6b6b;

@@ -894,26 +894,40 @@ class NOXApp {
         const closeBtn = document.getElementById('closeEditModal');
         const cancelBtn = document.getElementById('cancelEditSkill');
         const saveBtn = document.getElementById('saveEditSkill');
+        const revertBtn = document.getElementById('revertSkillJSON');
 
         // Close modal handlers
         closeBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
             this.selectedSkillToEdit = null;
+            this.originalSkillJSON = null;
         });
 
         cancelBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
             this.selectedSkillToEdit = null;
+            this.originalSkillJSON = null;
         });
 
         // Save changes
         saveBtn.addEventListener('click', () => this.saveSkillEdits());
+
+        // Revert changes
+        revertBtn.addEventListener('click', () => {
+            if (this.originalSkillJSON) {
+                document.getElementById('editSkillJSON').value = this.originalSkillJSON;
+                // Clear errors
+                document.getElementById('editSkillErrors').style.display = 'none';
+                document.getElementById('editSkillErrors').innerHTML = '';
+            }
+        });
 
         // Close on background click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');
                 this.selectedSkillToEdit = null;
+                this.originalSkillJSON = null;
             }
         });
     }
@@ -922,25 +936,40 @@ class NOXApp {
         this.selectedSkillToEdit = skill;
 
         const modal = document.getElementById('editSkillModal');
+        const jsonEditor = document.getElementById('editSkillJSON');
 
-        // Populate form fields
-        document.getElementById('editSkillName').value = skill.name || '';
-        document.getElementById('editSkillDescription').value = skill.description || '';
-        document.getElementById('editSkillCategory').value = skill.category || '';
-        document.getElementById('editSkillTriggers').value = Array.isArray(skill.triggers) ? skill.triggers.join(', ') : '';
-        document.getElementById('editSkillCypher').value = skill.cypher_template || '';
+        // Prepare skill object for editing
+        const editableSkill = {
+            id: skill.id,
+            name: skill.name || '',
+            description: skill.description || '',
+            category: skill.category || '',
+            triggers: skill.triggers || [],
+            cypher_template: skill.cypher_template || '',
+            parameters: skill.parameters || '{}',
+            usage_count: skill.usage_count || 0,
+            version: skill.version || 1,
+            created_at: skill.created_at || '',
+            updated_at: skill.updated_at || ''
+        };
 
-        // Parse parameters (stored as JSON string in Neo4j)
-        let parametersStr = '';
+        // Parse parameters if it's a string
         try {
-            if (skill.parameters) {
-                const params = typeof skill.parameters === 'string' ? JSON.parse(skill.parameters) : skill.parameters;
-                parametersStr = JSON.stringify(params, null, 2);
+            if (typeof editableSkill.parameters === 'string') {
+                editableSkill.parameters = JSON.parse(editableSkill.parameters);
             }
         } catch (error) {
-            parametersStr = skill.parameters || '{}';
+            editableSkill.parameters = {};
         }
-        document.getElementById('editSkillParameters').value = parametersStr;
+
+        // Convert to pretty-printed JSON
+        const prettyJSON = JSON.stringify(editableSkill, null, 2);
+
+        // Store original JSON for revert functionality
+        this.originalSkillJSON = prettyJSON;
+
+        // Populate JSON editor
+        jsonEditor.value = prettyJSON;
 
         // Clear errors
         document.getElementById('editSkillErrors').style.display = 'none';
@@ -953,33 +982,58 @@ class NOXApp {
     async saveSkillEdits() {
         if (!this.selectedSkillToEdit) return;
 
-        const updates = {
-            name: document.getElementById('editSkillName').value.trim(),
-            description: document.getElementById('editSkillDescription').value.trim(),
-            category: document.getElementById('editSkillCategory').value.trim(),
-            triggers: document.getElementById('editSkillTriggers').value,
-            cypher_template: document.getElementById('editSkillCypher').value.trim(),
-            parameters: document.getElementById('editSkillParameters').value.trim()
-        };
-
-        // Validate
-        const validation = this.skillLibraryManager.validateSkill(updates);
-        if (!validation.valid) {
-            this.showEditSkillErrors(validation.errors);
-            return;
-        }
+        const jsonEditor = document.getElementById('editSkillJSON');
+        const jsonText = jsonEditor.value.trim();
 
         try {
-            // Validate JSON parameters
-            if (updates.parameters) {
-                JSON.parse(updates.parameters);
+            // Parse JSON
+            const skillData = JSON.parse(jsonText);
+
+            // Validate required fields
+            if (!skillData.name || !skillData.name.trim()) {
+                this.showEditSkillErrors(['Skill name is required']);
+                return;
             }
 
+            if (!skillData.cypher_template || !skillData.cypher_template.trim()) {
+                this.showEditSkillErrors(['Cypher template is required']);
+                return;
+            }
+
+            // Prepare updates object
+            const updates = {
+                name: skillData.name.trim(),
+                description: (skillData.description || '').trim(),
+                category: (skillData.category || '').trim(),
+                triggers: skillData.triggers || [],
+                cypher_template: skillData.cypher_template.trim(),
+                parameters: skillData.parameters || {}
+            };
+
+            // Validate parameters is valid JSON (if it's a string)
+            if (typeof updates.parameters === 'string') {
+                try {
+                    updates.parameters = JSON.parse(updates.parameters);
+                } catch (e) {
+                    this.showEditSkillErrors(['Parameters must be valid JSON']);
+                    return;
+                }
+            }
+
+            // Validate with skill library manager
+            const validation = this.skillLibraryManager.validateSkill(updates);
+            if (!validation.valid) {
+                this.showEditSkillErrors(validation.errors);
+                return;
+            }
+
+            // Update skill
             const updated = await this.skillLibraryManager.updateSkill(this.selectedSkillToEdit.id, updates);
 
             // Close modal
             document.getElementById('editSkillModal').classList.add('hidden');
             this.selectedSkillToEdit = null;
+            this.originalSkillJSON = null;
 
             // Reload and display skills
             this.renderSkills();
@@ -990,7 +1044,13 @@ class NOXApp {
 
         } catch (error) {
             console.error('Save skill error:', error);
-            this.showEditSkillErrors([error.message]);
+
+            // Check if it's a JSON parse error
+            if (error instanceof SyntaxError) {
+                this.showEditSkillErrors([`Invalid JSON: ${error.message}`]);
+            } else {
+                this.showEditSkillErrors([error.message]);
+            }
         }
     }
 
