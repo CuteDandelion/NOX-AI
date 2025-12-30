@@ -75,6 +75,30 @@ class NOXApp {
         };
         this.currentStreamingSpeed = localStorage.getItem('streaming-speed') || 'normal';
 
+        // Initialize Chat Exporter
+        this.chatExporter = new ChatExporter(chatManager);
+
+        // Initialize Skills Library Manager
+        this.skillLibraryManager = new SkillLibraryManager(neo4jManager);
+        this.selectedSkillToEdit = null;
+        this.selectedSkillToDelete = null;
+
+        // Initialize Skill Prompting
+        this.selectedSkillsForPrompt = [];
+        this.skillSelectorSearchQuery = '';
+        this.currentWizardSkill = null;
+
+        // Initialize Autocomplete
+        this.recentQueries = this.loadRecentQueries();
+        this.slashCommands = [
+            { command: '/create-skill', description: 'Create a new skill via chat' },
+            { command: '/list-skills', description: 'List all available skills' },
+            { command: '/export-chat', description: 'Export current conversation' },
+            { command: '/use-skill', description: 'Use a skill for prompting' }
+        ];
+        this.autocompleteIndex = -1;
+        this.autocompleteSuggestions = [];
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -110,6 +134,18 @@ class NOXApp {
 
         // Streaming Speed
         this.setupStreamingSpeed();
+
+        // Export Chat
+        this.setupExportChat();
+
+        // Skills Library
+        this.setupSkillsLibrary();
+
+        // Skill-Based Prompting
+        this.setupSkillPrompting();
+
+        // Autocomplete
+        this.setupAutocomplete();
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -554,6 +590,1116 @@ class NOXApp {
         });
     }
 
+    // ==================== Export Chat ====================
+
+    setupExportChat() {
+        const exportButton = document.getElementById('exportChatButton');
+        const exportMenu = document.getElementById('exportChatMenu');
+        const exportOptions = exportMenu.querySelectorAll('.export-option');
+
+        // Toggle menu on button click
+        exportButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = exportMenu.style.display === 'block';
+            exportMenu.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Export option selection
+        exportOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const format = option.dataset.format;
+                this.exportChat(format);
+                exportMenu.style.display = 'none';
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!exportButton.contains(e.target) && !exportMenu.contains(e.target)) {
+                exportMenu.style.display = 'none';
+            }
+        });
+    }
+
+    exportChat(format) {
+        try {
+            this.chatExporter.export(format);
+            this.addSystemMessage(`✅ Chat exported as ${format.toUpperCase()}`);
+        } catch (error) {
+            console.error('Export error:', error);
+            this.addSystemMessage(`❌ Export failed: ${error.message}`);
+        }
+    }
+
+    // ==================== Skills Library ====================
+
+    setupSkillsLibrary() {
+        const skillsLibraryBtn = document.getElementById('skillsLibraryBtn');
+        const skillsLibraryWindow = document.getElementById('skillsLibraryWindow');
+        const closeSkillsLibrary = document.getElementById('closeSkillsLibrary');
+        const minimizeSkillsWindow = document.getElementById('minimizeSkillsWindow');
+        const maximizeSkillsWindow = document.getElementById('maximizeSkillsWindow');
+        const refreshSkills = document.getElementById('refreshSkills');
+        const skillsSearch = document.getElementById('skillsSearch');
+        const skillsCategoryFilter = document.getElementById('skillsCategoryFilter');
+
+        // Open Skills Library
+        skillsLibraryBtn.addEventListener('click', () => {
+            skillsLibraryWindow.classList.remove('hidden');
+            this.loadAndDisplaySkills();
+        });
+
+        // Close Skills Library
+        closeSkillsLibrary.addEventListener('click', () => {
+            skillsLibraryWindow.classList.add('hidden');
+        });
+
+        // Minimize window
+        minimizeSkillsWindow.addEventListener('click', () => {
+            skillsLibraryWindow.classList.toggle('minimized');
+        });
+
+        // Maximize window
+        maximizeSkillsWindow.addEventListener('click', () => {
+            skillsLibraryWindow.classList.toggle('maximized');
+        });
+
+        // Refresh skills
+        refreshSkills.addEventListener('click', () => {
+            this.loadAndDisplaySkills();
+        });
+
+        // Search functionality
+        skillsSearch.addEventListener('input', (e) => {
+            this.skillLibraryManager.searchQuery = e.target.value;
+            this.renderSkills();
+        });
+
+        // Category filter
+        skillsCategoryFilter.addEventListener('change', (e) => {
+            this.skillLibraryManager.filterCategory = e.target.value;
+            this.renderSkills();
+        });
+
+        // Setup modals
+        this.setupEditSkillModal();
+        this.setupDeleteSkillModal();
+
+        // Make window draggable (reuse existing functionality from Graph View)
+        this.makeWindowDraggable(skillsLibraryWindow);
+        this.makeWindowResizable(skillsLibraryWindow);
+    }
+
+    async loadAndDisplaySkills() {
+        const skillsStatus = document.getElementById('skillsStatus');
+        const skillsList = document.getElementById('skillsList');
+
+        try {
+            skillsStatus.textContent = 'Loading skills from Neo4j...';
+            skillsList.innerHTML = '<div class="skills-placeholder"><p>Loading...</p></div>';
+
+            await this.skillLibraryManager.loadSkills();
+
+            // Update category filter
+            this.updateCategoryFilter();
+
+            // Render skills
+            this.renderSkills();
+
+            // Update stats
+            this.updateSkillsStats();
+
+            skillsStatus.textContent = `Loaded ${this.skillLibraryManager.skills.length} skills from Neo4j.`;
+        } catch (error) {
+            console.error('Load skills error:', error);
+            skillsStatus.textContent = `Error: ${error.message}`;
+            skillsList.innerHTML = `<div class="skills-placeholder"><p style="color: #ff6b6b;">Failed to load skills: ${error.message}</p></div>`;
+        }
+    }
+
+    updateCategoryFilter() {
+        const categoryFilter = document.getElementById('skillsCategoryFilter');
+        const categories = this.skillLibraryManager.getCategories();
+
+        // Keep "All Categories" and add others
+        categoryFilter.innerHTML = '<option value="all">All Categories</option>';
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            categoryFilter.appendChild(option);
+        });
+    }
+
+    updateSkillsStats() {
+        const stats = this.skillLibraryManager.getStats();
+
+        document.getElementById('totalSkillsCount').textContent = stats.total;
+        document.getElementById('totalUsageCount').textContent = stats.totalUsage;
+        document.getElementById('categoriesCount').textContent = stats.byCategory.length;
+    }
+
+    renderSkills() {
+        const skillsList = document.getElementById('skillsList');
+        const filteredSkills = this.skillLibraryManager.getFilteredSkills();
+
+        if (filteredSkills.length === 0) {
+            skillsList.innerHTML = '<div class="skills-placeholder"><p>No skills found matching your criteria.</p></div>';
+            return;
+        }
+
+        skillsList.innerHTML = '';
+
+        filteredSkills.forEach(skill => {
+            const skillCard = this.createSkillCard(skill);
+            skillsList.appendChild(skillCard);
+        });
+    }
+
+    createSkillCard(skill) {
+        const card = document.createElement('div');
+        card.className = 'skill-card';
+
+        // Header with name and category
+        const header = document.createElement('div');
+        header.className = 'skill-card-header';
+
+        const title = document.createElement('h4');
+        title.className = 'skill-card-title';
+        title.textContent = skill.name;
+
+        const category = document.createElement('span');
+        category.className = 'skill-card-category';
+        category.textContent = skill.category || 'Uncategorized';
+
+        header.appendChild(title);
+        header.appendChild(category);
+
+        // Description
+        const description = document.createElement('p');
+        description.className = 'skill-card-description';
+        description.textContent = skill.description;
+
+        // Triggers
+        const triggersContainer = document.createElement('div');
+        triggersContainer.className = 'skill-card-triggers';
+
+        const triggers = Array.isArray(skill.triggers) ? skill.triggers : [];
+        triggers.slice(0, 3).forEach(trigger => {
+            const tag = document.createElement('span');
+            tag.className = 'skill-trigger-tag';
+            tag.textContent = trigger;
+            triggersContainer.appendChild(tag);
+        });
+
+        if (triggers.length > 3) {
+            const more = document.createElement('span');
+            more.className = 'skill-trigger-tag';
+            more.textContent = `+${triggers.length - 3} more`;
+            triggersContainer.appendChild(more);
+        }
+
+        // Footer with meta and actions
+        const footer = document.createElement('div');
+        footer.className = 'skill-card-footer';
+
+        const meta = document.createElement('div');
+        meta.className = 'skill-card-meta';
+        meta.textContent = `Used ${skill.usage_count || 0} times • v${skill.version || 1}`;
+
+        const actions = document.createElement('div');
+        actions.className = 'skill-card-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'skill-action-btn';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.openEditSkillModal(skill);
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'skill-action-btn danger';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.openDeleteSkillModal(skill);
+        });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+
+        footer.appendChild(meta);
+        footer.appendChild(actions);
+
+        // Assemble card
+        card.appendChild(header);
+        card.appendChild(description);
+        card.appendChild(triggersContainer);
+        card.appendChild(footer);
+
+        return card;
+    }
+
+    // ==================== Edit Skill Modal ====================
+
+    setupEditSkillModal() {
+        const modal = document.getElementById('editSkillModal');
+        const closeBtn = document.getElementById('closeEditModal');
+        const cancelBtn = document.getElementById('cancelEditSkill');
+        const saveBtn = document.getElementById('saveEditSkill');
+
+        // Close modal handlers
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.selectedSkillToEdit = null;
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.selectedSkillToEdit = null;
+        });
+
+        // Save changes
+        saveBtn.addEventListener('click', () => this.saveSkillEdits());
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                this.selectedSkillToEdit = null;
+            }
+        });
+    }
+
+    openEditSkillModal(skill) {
+        this.selectedSkillToEdit = skill;
+
+        const modal = document.getElementById('editSkillModal');
+
+        // Populate form fields
+        document.getElementById('editSkillName').value = skill.name || '';
+        document.getElementById('editSkillDescription').value = skill.description || '';
+        document.getElementById('editSkillCategory').value = skill.category || '';
+        document.getElementById('editSkillTriggers').value = Array.isArray(skill.triggers) ? skill.triggers.join(', ') : '';
+        document.getElementById('editSkillCypher').value = skill.cypher_template || '';
+
+        // Parse parameters (stored as JSON string in Neo4j)
+        let parametersStr = '';
+        try {
+            if (skill.parameters) {
+                const params = typeof skill.parameters === 'string' ? JSON.parse(skill.parameters) : skill.parameters;
+                parametersStr = JSON.stringify(params, null, 2);
+            }
+        } catch (error) {
+            parametersStr = skill.parameters || '{}';
+        }
+        document.getElementById('editSkillParameters').value = parametersStr;
+
+        // Clear errors
+        document.getElementById('editSkillErrors').style.display = 'none';
+        document.getElementById('editSkillErrors').innerHTML = '';
+
+        // Show modal
+        modal.classList.remove('hidden');
+    }
+
+    async saveSkillEdits() {
+        if (!this.selectedSkillToEdit) return;
+
+        const updates = {
+            name: document.getElementById('editSkillName').value.trim(),
+            description: document.getElementById('editSkillDescription').value.trim(),
+            category: document.getElementById('editSkillCategory').value.trim(),
+            triggers: document.getElementById('editSkillTriggers').value,
+            cypher_template: document.getElementById('editSkillCypher').value.trim(),
+            parameters: document.getElementById('editSkillParameters').value.trim()
+        };
+
+        // Validate
+        const validation = this.skillLibraryManager.validateSkill(updates);
+        if (!validation.valid) {
+            this.showEditSkillErrors(validation.errors);
+            return;
+        }
+
+        try {
+            // Validate JSON parameters
+            if (updates.parameters) {
+                JSON.parse(updates.parameters);
+            }
+
+            const updated = await this.skillLibraryManager.updateSkill(this.selectedSkillToEdit.id, updates);
+
+            // Close modal
+            document.getElementById('editSkillModal').classList.add('hidden');
+            this.selectedSkillToEdit = null;
+
+            // Reload and display skills
+            this.renderSkills();
+            this.updateSkillsStats();
+
+            // Show success message
+            this.addSystemMessage(`✅ Skill "${updates.name}" updated successfully (v${updated.version})`);
+
+        } catch (error) {
+            console.error('Save skill error:', error);
+            this.showEditSkillErrors([error.message]);
+        }
+    }
+
+    showEditSkillErrors(errors) {
+        const errorsDiv = document.getElementById('editSkillErrors');
+        errorsDiv.innerHTML = '<ul>' + errors.map(err => `<li>${err}</li>`).join('') + '</ul>';
+        errorsDiv.style.display = 'block';
+    }
+
+    // ==================== Delete Skill Modal ====================
+
+    setupDeleteSkillModal() {
+        const modal = document.getElementById('deleteSkillModal');
+        const closeBtn = document.getElementById('closeDeleteModal');
+        const cancelBtn = document.getElementById('cancelDeleteSkill');
+        const confirmBtn = document.getElementById('confirmDeleteSkill');
+
+        // Close modal handlers
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.selectedSkillToDelete = null;
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.selectedSkillToDelete = null;
+        });
+
+        // Confirm delete
+        confirmBtn.addEventListener('click', () => this.confirmDeleteSkill());
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                this.selectedSkillToDelete = null;
+            }
+        });
+    }
+
+    openDeleteSkillModal(skill) {
+        this.selectedSkillToDelete = skill;
+
+        const modal = document.getElementById('deleteSkillModal');
+        const message = document.getElementById('deleteSkillMessage');
+
+        message.textContent = `Are you sure you want to delete "${skill.name}"?`;
+
+        modal.classList.remove('hidden');
+    }
+
+    async confirmDeleteSkill() {
+        if (!this.selectedSkillToDelete) return;
+
+        const skillName = this.selectedSkillToDelete.name;
+
+        try {
+            const success = await this.skillLibraryManager.deleteSkill(this.selectedSkillToDelete.id);
+
+            if (success) {
+                // Close modal
+                document.getElementById('deleteSkillModal').classList.add('hidden');
+                this.selectedSkillToDelete = null;
+
+                // Reload and display skills
+                this.updateCategoryFilter();
+                this.renderSkills();
+                this.updateSkillsStats();
+
+                // Show success message
+                this.addSystemMessage(`✅ Skill "${skillName}" deleted successfully`);
+            } else {
+                this.addSystemMessage(`❌ Failed to delete skill "${skillName}"`);
+            }
+
+        } catch (error) {
+            console.error('Delete skill error:', error);
+            this.addSystemMessage(`❌ Delete failed: ${error.message}`);
+        }
+    }
+
+    // ==================== Skill-Based Prompting ====================
+
+    setupSkillPrompting() {
+        const skillSelectorButton = document.getElementById('skillSelectorButton');
+        const skillSelectorMenu = document.getElementById('skillSelectorMenu');
+        const skillSelectorSearch = document.getElementById('skillSelectorSearch');
+
+        // Toggle skill selector menu
+        skillSelectorButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = skillSelectorMenu.style.display === 'block';
+            skillSelectorMenu.style.display = isVisible ? 'none' : 'block';
+
+            if (!isVisible) {
+                this.loadSkillsForSelector();
+            }
+        });
+
+        // Search skills in selector
+        skillSelectorSearch.addEventListener('input', (e) => {
+            this.skillSelectorSearchQuery = e.target.value;
+            this.renderSkillSelectorList();
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!skillSelectorButton.contains(e.target) && !skillSelectorMenu.contains(e.target)) {
+                skillSelectorMenu.style.display = 'none';
+            }
+        });
+
+        // Setup parameter wizard modal
+        this.setupParameterWizard();
+    }
+
+    async loadSkillsForSelector() {
+        const skillSelectorList = document.getElementById('skillSelectorList');
+
+        try {
+            // Load skills if not already loaded
+            if (this.skillLibraryManager.skills.length === 0) {
+                skillSelectorList.innerHTML = '<div class="skill-selector-placeholder"><p>Loading...</p></div>';
+                await this.skillLibraryManager.loadSkills();
+            }
+
+            this.renderSkillSelectorList();
+        } catch (error) {
+            console.error('Load skills for selector error:', error);
+            skillSelectorList.innerHTML = '<div class="skill-selector-placeholder"><p style="color: #ff6b6b;">Failed to load skills</p></div>';
+        }
+    }
+
+    renderSkillSelectorList() {
+        const skillSelectorList = document.getElementById('skillSelectorList');
+        const query = this.skillSelectorSearchQuery.toLowerCase();
+
+        // Filter skills
+        let skills = this.skillLibraryManager.skills;
+        if (query) {
+            skills = skills.filter(skill =>
+                skill.name.toLowerCase().includes(query) ||
+                skill.description.toLowerCase().includes(query) ||
+                (skill.triggers && skill.triggers.some(t => t.toLowerCase().includes(query)))
+            );
+        }
+
+        if (skills.length === 0) {
+            skillSelectorList.innerHTML = '<div class="skill-selector-placeholder"><p>No skills found</p></div>';
+            return;
+        }
+
+        skillSelectorList.innerHTML = '';
+
+        skills.forEach(skill => {
+            const item = document.createElement('div');
+            item.className = 'skill-selector-item';
+
+            const name = document.createElement('div');
+            name.className = 'skill-selector-item-name';
+            name.textContent = skill.name;
+
+            const desc = document.createElement('div');
+            desc.className = 'skill-selector-item-desc';
+            desc.textContent = skill.description;
+
+            const triggersContainer = document.createElement('div');
+            triggersContainer.className = 'skill-selector-item-triggers';
+
+            const triggers = Array.isArray(skill.triggers) ? skill.triggers : [];
+            triggers.slice(0, 3).forEach(trigger => {
+                const tag = document.createElement('span');
+                tag.className = 'skill-selector-trigger';
+                tag.textContent = trigger;
+                triggersContainer.appendChild(tag);
+            });
+
+            item.appendChild(name);
+            item.appendChild(desc);
+            if (triggers.length > 0) {
+                item.appendChild(triggersContainer);
+            }
+
+            // Click to select skill
+            item.addEventListener('click', () => {
+                this.selectSkill(skill);
+            });
+
+            skillSelectorList.appendChild(item);
+        });
+    }
+
+    selectSkill(skill) {
+        // Close selector menu
+        document.getElementById('skillSelectorMenu').style.display = 'none';
+
+        // Check if skill has parameters
+        const parameters = this.extractParametersFromCypher(skill.cypher_template);
+
+        if (parameters.length > 0) {
+            // Open parameter wizard
+            this.openParameterWizard(skill, parameters);
+        } else {
+            // Generate prompt directly (no parameters needed)
+            this.generatePromptFromSkill(skill, {});
+        }
+    }
+
+    extractParametersFromCypher(cypherTemplate) {
+        // Extract $paramName from Cypher template
+        const paramRegex = /\$(\w+)/g;
+        const params = [];
+        let match;
+
+        while ((match = paramRegex.exec(cypherTemplate)) !== null) {
+            const paramName = match[1];
+            if (!params.find(p => p.name === paramName)) {
+                params.push({
+                    name: paramName,
+                    required: true,
+                    hint: `Value for ${paramName}`
+                });
+            }
+        }
+
+        return params;
+    }
+
+    // ==================== Parameter Wizard ====================
+
+    setupParameterWizard() {
+        const modal = document.getElementById('parameterWizardModal');
+        const closeBtn = document.getElementById('closeWizardModal');
+        const cancelBtn = document.getElementById('cancelWizard');
+        const generateBtn = document.getElementById('generatePrompt');
+
+        // Close modal handlers
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.currentWizardSkill = null;
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.currentWizardSkill = null;
+        });
+
+        // Generate prompt
+        generateBtn.addEventListener('click', () => this.generatePromptFromWizard());
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                this.currentWizardSkill = null;
+            }
+        });
+    }
+
+    openParameterWizard(skill, parameters) {
+        this.currentWizardSkill = skill;
+
+        const modal = document.getElementById('parameterWizardModal');
+        const skillNameEl = document.getElementById('wizardSkillName');
+        const skillDescEl = document.getElementById('wizardSkillDescription');
+        const formEl = document.getElementById('wizardParametersForm');
+
+        skillNameEl.textContent = skill.name;
+        skillDescEl.textContent = skill.description;
+
+        // Build parameter form
+        formEl.innerHTML = '';
+
+        parameters.forEach(param => {
+            const group = document.createElement('div');
+            group.className = 'wizard-param-group';
+
+            const label = document.createElement('label');
+            label.className = 'wizard-param-label';
+            label.textContent = param.name;
+            if (param.required) {
+                const required = document.createElement('span');
+                required.className = 'required';
+                required.textContent = '*';
+                label.appendChild(required);
+            }
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'wizard-param-input';
+            input.id = `wizard-param-${param.name}`;
+            input.placeholder = `Enter ${param.name}...`;
+            input.required = param.required;
+
+            if (param.hint) {
+                const hint = document.createElement('div');
+                hint.className = 'wizard-param-hint';
+                hint.textContent = param.hint;
+                group.appendChild(label);
+                group.appendChild(input);
+                group.appendChild(hint);
+            } else {
+                group.appendChild(label);
+                group.appendChild(input);
+            }
+
+            formEl.appendChild(group);
+        });
+
+        modal.classList.remove('hidden');
+    }
+
+    generatePromptFromWizard() {
+        if (!this.currentWizardSkill) return;
+
+        const formEl = document.getElementById('wizardParametersForm');
+        const inputs = formEl.querySelectorAll('.wizard-param-input');
+        const paramValues = {};
+
+        // Collect parameter values
+        let isValid = true;
+        inputs.forEach(input => {
+            const paramName = input.id.replace('wizard-param-', '');
+            const value = input.value.trim();
+
+            if (input.required && !value) {
+                input.style.borderColor = '#ff6b6b';
+                isValid = false;
+            } else {
+                input.style.borderColor = '';
+                paramValues[paramName] = value;
+            }
+        });
+
+        if (!isValid) {
+            return;
+        }
+
+        // Generate prompt
+        this.generatePromptFromSkill(this.currentWizardSkill, paramValues);
+
+        // Close modal
+        document.getElementById('parameterWizardModal').classList.add('hidden');
+        this.currentWizardSkill = null;
+    }
+
+    generatePromptFromSkill(skill, paramValues) {
+        // Create a natural language prompt based on skill and parameters
+        let prompt = `Using the "${skill.name}" skill: ${skill.description}`;
+
+        if (Object.keys(paramValues).length > 0) {
+            prompt += '\n\nParameters:';
+            for (const [key, value] of Object.entries(paramValues)) {
+                prompt += `\n- ${key}: ${value}`;
+            }
+        }
+
+        // Set prompt in chat input
+        const chatInput = document.getElementById('chatInput');
+        chatInput.value = prompt;
+
+        // Add skill chip
+        this.addSkillChip(skill);
+
+        // Auto-resize textarea
+        chatInput.style.height = 'auto';
+        chatInput.style.height = chatInput.scrollHeight + 'px';
+
+        // Focus on input
+        chatInput.focus();
+
+        // Show success message
+        this.addSystemMessage(`✨ Generated prompt for "${skill.name}" skill`);
+    }
+
+    addSkillChip(skill) {
+        // Check if already added
+        if (this.selectedSkillsForPrompt.find(s => s.id === skill.id)) {
+            return;
+        }
+
+        this.selectedSkillsForPrompt.push(skill);
+        this.renderSkillChips();
+    }
+
+    removeSkillChip(skillId) {
+        this.selectedSkillsForPrompt = this.selectedSkillsForPrompt.filter(s => s.id !== skillId);
+        this.renderSkillChips();
+    }
+
+    renderSkillChips() {
+        const skillChipsContainer = document.getElementById('skillChips');
+
+        if (this.selectedSkillsForPrompt.length === 0) {
+            skillChipsContainer.style.display = 'none';
+            return;
+        }
+
+        skillChipsContainer.style.display = 'flex';
+        skillChipsContainer.innerHTML = '';
+
+        this.selectedSkillsForPrompt.forEach(skill => {
+            const chip = document.createElement('div');
+            chip.className = 'skill-chip';
+
+            const name = document.createElement('span');
+            name.className = 'skill-chip-name';
+            name.textContent = skill.name;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'skill-chip-remove';
+            removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeSkillChip(skill.id);
+            });
+
+            chip.appendChild(name);
+            chip.appendChild(removeBtn);
+
+            skillChipsContainer.appendChild(chip);
+        });
+    }
+
+    // ==================== Autocomplete ====================
+
+    setupAutocomplete() {
+        const chatInput = document.getElementById('chatInput');
+        const autocompleteDropdown = document.getElementById('autocompleteDropdown');
+
+        // Show autocomplete on input
+        chatInput.addEventListener('input', (e) => {
+            this.handleAutocompleteInput(e.target.value);
+        });
+
+        // Handle keyboard navigation
+        chatInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById('autocompleteDropdown');
+            if (dropdown.style.display === 'none') return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.navigateAutocomplete(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.navigateAutocomplete(-1);
+            } else if (e.key === 'Enter' && this.autocompleteIndex >= 0) {
+                e.preventDefault();
+                this.selectAutocompleteSuggestion(this.autocompleteSuggestions[this.autocompleteIndex]);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.hideAutocomplete();
+            }
+        });
+
+        // Hide autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!chatInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
+                this.hideAutocomplete();
+            }
+        });
+
+        // Load skills for trigger detection
+        this.loadSkillsForAutocomplete();
+    }
+
+    async loadSkillsForAutocomplete() {
+        try {
+            if (this.skillLibraryManager.skills.length === 0) {
+                await this.skillLibraryManager.loadSkills();
+            }
+        } catch (error) {
+            console.error('Failed to load skills for autocomplete:', error);
+        }
+    }
+
+    handleAutocompleteInput(value) {
+        if (!value || value.trim() === '') {
+            this.hideAutocomplete();
+            return;
+        }
+
+        const suggestions = [];
+
+        // Check for slash commands
+        if (value.startsWith('/')) {
+            const matchingCommands = this.slashCommands.filter(cmd =>
+                cmd.command.startsWith(value.toLowerCase())
+            );
+
+            matchingCommands.forEach(cmd => {
+                suggestions.push({
+                    type: 'command',
+                    icon: '⚡',
+                    title: cmd.command,
+                    description: cmd.description,
+                    value: cmd.command
+                });
+            });
+        }
+
+        // Check for skill triggers
+        const lowerValue = value.toLowerCase();
+        const matchingSkills = this.skillLibraryManager.skills.filter(skill => {
+            if (!skill.triggers) return false;
+            return skill.triggers.some(trigger =>
+                trigger.toLowerCase().includes(lowerValue) ||
+                lowerValue.includes(trigger.toLowerCase())
+            );
+        });
+
+        matchingSkills.slice(0, 5).forEach(skill => {
+            suggestions.push({
+                type: 'skill',
+                icon: '🎯',
+                title: skill.name,
+                description: skill.description,
+                value: skill,
+                isSkill: true
+            });
+        });
+
+        // Check for recent queries
+        const matchingQueries = this.recentQueries.filter(query =>
+            query.toLowerCase().includes(lowerValue)
+        );
+
+        matchingQueries.slice(0, 5).forEach(query => {
+            suggestions.push({
+                type: 'recent',
+                icon: '🕐',
+                title: query,
+                description: 'Recent query',
+                value: query
+            });
+        });
+
+        if (suggestions.length > 0) {
+            this.showAutocomplete(suggestions);
+        } else {
+            this.hideAutocomplete();
+        }
+    }
+
+    showAutocomplete(suggestions) {
+        this.autocompleteSuggestions = suggestions;
+        this.autocompleteIndex = -1;
+
+        const dropdown = document.getElementById('autocompleteDropdown');
+        dropdown.innerHTML = '';
+
+        // Group suggestions by type
+        const commandSuggestions = suggestions.filter(s => s.type === 'command');
+        const skillSuggestions = suggestions.filter(s => s.type === 'skill');
+        const recentSuggestions = suggestions.filter(s => s.type === 'recent');
+
+        // Add slash commands section
+        if (commandSuggestions.length > 0) {
+            const section = this.createAutocompleteSection('Commands', commandSuggestions);
+            dropdown.appendChild(section);
+        }
+
+        // Add skills section
+        if (skillSuggestions.length > 0) {
+            if (commandSuggestions.length > 0) {
+                const separator = document.createElement('div');
+                separator.className = 'autocomplete-separator';
+                dropdown.appendChild(separator);
+            }
+
+            const section = this.createAutocompleteSection('Skills', skillSuggestions);
+            dropdown.appendChild(section);
+        }
+
+        // Add recent queries section
+        if (recentSuggestions.length > 0) {
+            if (commandSuggestions.length > 0 || skillSuggestions.length > 0) {
+                const separator = document.createElement('div');
+                separator.className = 'autocomplete-separator';
+                dropdown.appendChild(separator);
+            }
+
+            const section = this.createAutocompleteSection('Recent Queries', recentSuggestions);
+            dropdown.appendChild(section);
+        }
+
+        dropdown.style.display = 'block';
+    }
+
+    createAutocompleteSection(title, suggestions) {
+        const section = document.createElement('div');
+        section.className = 'autocomplete-section';
+
+        const header = document.createElement('div');
+        header.className = 'autocomplete-section-header';
+        header.textContent = title;
+        section.appendChild(header);
+
+        suggestions.forEach((suggestion, index) => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.dataset.index = this.autocompleteSuggestions.indexOf(suggestion);
+
+            const icon = document.createElement('div');
+            icon.className = 'autocomplete-item-icon';
+            icon.textContent = suggestion.icon;
+
+            const content = document.createElement('div');
+            content.className = 'autocomplete-item-content';
+
+            const titleEl = document.createElement('div');
+            titleEl.className = 'autocomplete-item-title';
+            titleEl.textContent = suggestion.title;
+
+            const descEl = document.createElement('div');
+            descEl.className = 'autocomplete-item-desc';
+            descEl.textContent = suggestion.description;
+
+            content.appendChild(titleEl);
+            content.appendChild(descEl);
+
+            item.appendChild(icon);
+            item.appendChild(content);
+
+            item.addEventListener('click', () => {
+                this.selectAutocompleteSuggestion(suggestion);
+            });
+
+            section.appendChild(item);
+        });
+
+        return section;
+    }
+
+    navigateAutocomplete(direction) {
+        const items = document.querySelectorAll('.autocomplete-item');
+        if (items.length === 0) return;
+
+        // Remove active class from current item
+        if (this.autocompleteIndex >= 0 && this.autocompleteIndex < items.length) {
+            items[this.autocompleteIndex].classList.remove('active');
+        }
+
+        // Update index
+        this.autocompleteIndex += direction;
+
+        // Wrap around
+        if (this.autocompleteIndex < 0) {
+            this.autocompleteIndex = items.length - 1;
+        } else if (this.autocompleteIndex >= items.length) {
+            this.autocompleteIndex = 0;
+        }
+
+        // Add active class to new item
+        items[this.autocompleteIndex].classList.add('active');
+
+        // Scroll into view
+        items[this.autocompleteIndex].scrollIntoView({
+            block: 'nearest',
+            behavior: 'smooth'
+        });
+    }
+
+    selectAutocompleteSuggestion(suggestion) {
+        const chatInput = document.getElementById('chatInput');
+
+        if (suggestion.type === 'command') {
+            // Handle slash commands
+            this.handleSlashCommand(suggestion.value);
+        } else if (suggestion.type === 'skill' && suggestion.isSkill) {
+            // Handle skill selection
+            this.selectSkill(suggestion.value);
+        } else {
+            // Insert text suggestion
+            chatInput.value = suggestion.value;
+
+            // Auto-resize textarea
+            chatInput.style.height = 'auto';
+            chatInput.style.height = chatInput.scrollHeight + 'px';
+        }
+
+        this.hideAutocomplete();
+        chatInput.focus();
+    }
+
+    handleSlashCommand(command) {
+        const chatInput = document.getElementById('chatInput');
+
+        switch (command) {
+            case '/create-skill':
+                chatInput.value = 'Create a new skill with the following:\nName: \nDescription: \nCategory: \nTriggers: \nCypher Template: ';
+                break;
+
+            case '/list-skills':
+                chatInput.value = 'List all available skills in the system';
+                break;
+
+            case '/export-chat':
+                // Directly trigger export menu
+                document.getElementById('exportChatButton').click();
+                chatInput.value = '';
+                return;
+
+            case '/use-skill':
+                // Directly trigger skill selector
+                document.getElementById('skillSelectorButton').click();
+                chatInput.value = '';
+                return;
+
+            default:
+                chatInput.value = command + ' ';
+        }
+
+        // Auto-resize textarea
+        chatInput.style.height = 'auto';
+        chatInput.style.height = chatInput.scrollHeight + 'px';
+    }
+
+    hideAutocomplete() {
+        const dropdown = document.getElementById('autocompleteDropdown');
+        dropdown.style.display = 'none';
+        this.autocompleteIndex = -1;
+        this.autocompleteSuggestions = [];
+    }
+
+    loadRecentQueries() {
+        try {
+            const stored = localStorage.getItem('nox-ai-recent-queries');
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error('Failed to load recent queries:', error);
+            return [];
+        }
+    }
+
+    saveRecentQuery(query) {
+        if (!query || query.trim() === '') return;
+
+        // Remove if already exists
+        this.recentQueries = this.recentQueries.filter(q => q !== query);
+
+        // Add to beginning
+        this.recentQueries.unshift(query);
+
+        // Keep only last 20
+        this.recentQueries = this.recentQueries.slice(0, 20);
+
+        // Save to localStorage
+        try {
+            localStorage.setItem('nox-ai-recent-queries', JSON.stringify(this.recentQueries));
+        } catch (error) {
+            console.error('Failed to save recent queries:', error);
+        }
+    }
+
     // ==================== Chat Management ====================
 
 
@@ -938,6 +2084,11 @@ class NOXApp {
         // Display user message
         this.displayMessage(userMessage);
         chatManager.addMessage(userMessage);
+
+        // Save to recent queries
+        if (message) {
+            this.saveRecentQuery(message);
+        }
 
         // Clear input
         this.chatInput.value = '';

@@ -64,9 +64,23 @@
                         <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
                     </svg>
                 </button>
+                <button id="skillsLibraryBtn" class="icon-button" title="Skills Library">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </button>
                 <button id="streamSpeedButton" class="icon-button" title="Streaming Speed">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </button>
+                <button id="exportChatButton" class="icon-button" title="Export Conversation">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
                 </button>
                 <button id="settingsButton" class="icon-button" title="Settings">
@@ -110,6 +124,50 @@
             </button>
         </div>
 
+        <!-- Export Chat Menu -->
+        <div id="exportChatMenu" class="export-menu" style="display: none;">
+            <div class="export-menu-header">Export Conversation</div>
+            <button class="export-option" data-format="json">
+                <span class="export-icon">📄</span>
+                <span class="export-label">JSON</span>
+                <span class="export-desc">With metadata</span>
+            </button>
+            <button class="export-option" data-format="markdown">
+                <span class="export-icon">📝</span>
+                <span class="export-label">Markdown</span>
+                <span class="export-desc">Human-readable</span>
+            </button>
+            <button class="export-option" data-format="html">
+                <span class="export-icon">🌐</span>
+                <span class="export-label">HTML</span>
+                <span class="export-desc">Styled page</span>
+            </button>
+        </div>
+
+        <!-- Skill Selector Menu -->
+        <div id="skillSelectorMenu" class="skill-selector-menu" style="display: none;">
+            <div class="skill-selector-header">
+                <span>Select a Skill</span>
+                <input
+                    type="text"
+                    id="skillSelectorSearch"
+                    class="skill-selector-search"
+                    placeholder="Search skills..."
+                    autocomplete="off"
+                />
+            </div>
+            <div id="skillSelectorList" class="skill-selector-list">
+                <div class="skill-selector-placeholder">
+                    <p>Loading skills...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Autocomplete Dropdown -->
+        <div id="autocompleteDropdown" class="autocomplete-dropdown" style="display: none;">
+            <!-- Autocomplete suggestions will be dynamically inserted here -->
+        </div>
+
         <!-- Main Area -->
         <div class="main-area">
                 <!-- Chat Section -->
@@ -129,6 +187,9 @@
                     <div class="chat-input-container">
                         <!-- Attached Files Preview - Inline -->
                         <div id="attachedFiles" class="attached-files" style="display: none;"></div>
+
+                        <!-- Skill Chips Container -->
+                        <div id="skillChips" class="skill-chips-container" style="display: none;"></div>
 
                         <div class="input-actions">
                             <button id="attachButton" class="action-button" title="Attach file or image">
@@ -152,6 +213,13 @@
                             data-1p-ignore="true"
                         ></textarea>
                         <div class="input-actions">
+                            <button id="skillSelectorButton" class="action-button" title="Use Skill">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    <path d="M12 2a10 10 0 0 0 0 20" stroke-dasharray="3 3" opacity="0.5"></path>
+                                </svg>
+                            </button>
                             <button id="voiceButton" class="action-button" title="Voice input">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"></path>
@@ -465,6 +533,188 @@
         <div class="window-resize-handle"></div>
     </div>
 
+    <!-- Skills Library Floating Window -->
+    <div id="skillsLibraryWindow" class="floating-window hidden">
+        <div class="floating-window-header">
+            <div class="window-title-bar">
+                <h3 class="window-title">Skills Library</h3>
+                <div class="window-controls">
+                    <button id="minimizeSkillsWindow" class="window-control-btn" title="Minimize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                    <button id="maximizeSkillsWindow" class="window-control-btn" title="Maximize">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        </svg>
+                    </button>
+                    <button id="closeSkillsLibrary" class="window-control-btn close" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="floating-window-body">
+            <!-- Skills Library Controls -->
+            <div class="skills-library-controls">
+                <div class="skills-search-row">
+                    <div class="form-group" style="flex: 1; margin-right: 12px;">
+                        <label for="skillsSearch">Search:</label>
+                        <input
+                            type="text"
+                            id="skillsSearch"
+                            class="skills-search-input"
+                            placeholder="Search by name, description, or trigger..."
+                            autocomplete="off"
+                        />
+                    </div>
+                    <div class="form-group" style="width: 200px; margin-right: 12px;">
+                        <label for="skillsCategoryFilter">Category:</label>
+                        <select id="skillsCategoryFilter" class="skills-category-select">
+                            <option value="all">All Categories</option>
+                        </select>
+                    </div>
+                    <button id="refreshSkills" class="btn-secondary" title="Reload Skills">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Skills Stats -->
+                <div class="skills-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Skills:</span>
+                        <span class="stat-value" id="totalSkillsCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Usage:</span>
+                        <span class="stat-value" id="totalUsageCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Categories:</span>
+                        <span class="stat-value" id="categoriesCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skills List -->
+            <div id="skillsList" class="skills-list">
+                <div class="skills-placeholder">
+                    <p>Loading skills from Neo4j...</p>
+                </div>
+            </div>
+
+            <div id="skillsStatus" class="skills-status">
+                Click "Refresh" to load skills from Neo4j.
+            </div>
+        </div>
+
+        <!-- Resize handle -->
+        <div class="window-resize-handle"></div>
+    </div>
+
+    <!-- Edit Skill Modal -->
+    <div id="editSkillModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Skill</h3>
+                <button id="closeEditModal" class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="editSkillName">Name:</label>
+                    <input type="text" id="editSkillName" class="modal-input" />
+                </div>
+                <div class="form-group">
+                    <label for="editSkillDescription">Description:</label>
+                    <textarea id="editSkillDescription" class="modal-textarea" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editSkillCategory">Category:</label>
+                    <input type="text" id="editSkillCategory" class="modal-input" />
+                </div>
+                <div class="form-group">
+                    <label for="editSkillTriggers">Triggers (comma-separated):</label>
+                    <input type="text" id="editSkillTriggers" class="modal-input" placeholder="trigger1, trigger2, trigger3" />
+                </div>
+                <div class="form-group">
+                    <label for="editSkillCypher">Cypher Template:</label>
+                    <textarea id="editSkillCypher" class="modal-textarea code-editor" rows="8" spellcheck="false"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="editSkillParameters">Parameters (JSON):</label>
+                    <textarea id="editSkillParameters" class="modal-textarea code-editor" rows="4" spellcheck="false"></textarea>
+                </div>
+                <div id="editSkillErrors" class="modal-errors" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelEditSkill" class="btn-secondary">Cancel</button>
+                <button id="saveEditSkill" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Skill Confirmation Modal -->
+    <div id="deleteSkillModal" class="modal hidden">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Delete Skill</h3>
+                <button id="closeDeleteModal" class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteSkillMessage">Are you sure you want to delete this skill?</p>
+                <p style="margin-top: 8px; color: var(--text-secondary); font-size: 13px;">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelDeleteSkill" class="btn-secondary">Cancel</button>
+                <button id="confirmDeleteSkill" class="btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parameter Wizard Modal -->
+    <div id="parameterWizardModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="wizardSkillName">Configure Skill Parameters</h3>
+                <button id="closeWizardModal" class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="wizardSkillDescription" style="color: var(--text-secondary); margin-bottom: 20px;"></p>
+                <div id="wizardParametersForm" class="wizard-parameters-form">
+                    <!-- Parameters will be dynamically generated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelWizard" class="btn-secondary">Cancel</button>
+                <button id="generatePrompt" class="btn-primary">Generate Prompt</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Marked.js for markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
@@ -486,6 +736,8 @@
     <script src="/nox/js/n8n.js"></script>
     <script src="/nox/js/neo4j-manager.js"></script>
     <script src="/nox/js/chat-manager.js"></script>
+    <script src="/nox/js/chat-exporter.js"></script>
+    <script src="/nox/js/skill-library-manager.js"></script>
     <script src="/nox/js/app.js"></script>
 </body>
 </html>
