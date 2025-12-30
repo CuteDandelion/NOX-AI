@@ -107,6 +107,49 @@ class NOXApp {
         this.setupTextareaAutoResize();
         this.restoreSidebarStates();
         this.loadCurrentChat();
+        this.initializeWelcomeScreen();
+    }
+
+    initializeWelcomeScreen() {
+        const chatSection = document.querySelector('.chat-section');
+        const messages = chatManager.getMessages();
+
+        // Set initial state based on whether there are messages
+        if (messages.length === 0) {
+            chatSection.classList.add('centered');
+            chatSection.classList.remove('bottom');
+        } else {
+            chatSection.classList.add('bottom');
+            chatSection.classList.remove('centered');
+            document.getElementById('welcomeScreen').classList.add('hidden');
+        }
+
+        // Collapse execution panel by default
+        const executionPanel = document.getElementById('executionPanel');
+        if (executionPanel && !executionPanel.classList.contains('collapsed')) {
+            executionPanel.classList.add('collapsed');
+        }
+    }
+
+    transitionToChatMode() {
+        const chatSection = document.querySelector('.chat-section');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+
+        chatSection.classList.remove('centered');
+        chatSection.classList.add('bottom');
+
+        setTimeout(() => {
+            welcomeScreen.classList.add('hidden');
+        }, 300);
+    }
+
+    transitionToWelcomeMode() {
+        const chatSection = document.querySelector('.chat-section');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+
+        welcomeScreen.classList.remove('hidden');
+        chatSection.classList.remove('bottom');
+        chatSection.classList.add('centered');
     }
 
     setupEventListeners() {
@@ -1750,8 +1793,8 @@ class NOXApp {
         this.chatInput.value = '';
         this.chatInput.style.height = 'auto';
 
-        // Show welcome message
-        this.addSystemMessage('🔄 Chat reset! Welcome to NOX.AI. How can I help you today?');
+        // Transition back to welcome screen
+        this.transitionToWelcomeMode();
 
         // Focus on input
         this.chatInput.focus();
@@ -2101,6 +2144,12 @@ class NOXApp {
         // Display user message
         this.displayMessage(userMessage);
         chatManager.addMessage(userMessage);
+
+        // Transition from welcome screen to chat mode if this is the first message
+        const chatSection = document.querySelector('.chat-section');
+        if (chatSection.classList.contains('centered')) {
+            this.transitionToChatMode();
+        }
 
         // Save to recent queries
         if (message) {

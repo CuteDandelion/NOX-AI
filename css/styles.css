@@ -3040,6 +3040,102 @@ body {
     font-style: italic;
 }
 
+/* ==================== Welcome Screen ==================== */
+
+.welcome-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 1;
+}
+
+.welcome-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.welcome-content {
+    text-align: center;
+    padding: 40px;
+}
+
+.welcome-title {
+    font-size: 48px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 16px 0;
+    letter-spacing: -0.5px;
+}
+
+.welcome-subtitle {
+    font-size: 20px;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 400;
+}
+
+/* Chat Section States */
+.chat-section {
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chat-input-container {
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Centered State (Initial) */
+.chat-section.centered {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.chat-section.centered .chat-messages {
+    display: none;
+}
+
+.chat-section.centered .chat-input-container {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 800px;
+    z-index: 10;
+}
+
+/* Bottom State (After first message) */
+.chat-section.bottom .welcome-screen {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chat-section.bottom .chat-messages {
+    display: flex;
+}
+
+.chat-section.bottom .chat-input-container {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    max-width: none;
+}
+
 /* ==================== Autocomplete ====================  */
 
 .autocomplete-dropdown {
