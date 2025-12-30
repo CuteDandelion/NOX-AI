@@ -97,7 +97,7 @@ class Neo4jManager {
      * @param {string} cypherQuery - Cypher query to execute
      * @returns {Promise<Object>} - Query results
      */
-    async executeQuery(cypherQuery) {
+    async executeQuery(cypherQuery, parameters = {}) {
         if (!this.config.neo4jUrl || !this.config.neo4jUsername || !this.config.neo4jPassword) {
             throw new Error('Neo4j not configured. Please check settings.');
         }
@@ -105,6 +105,17 @@ class Neo4jManager {
         const authHeader = 'Basic ' + btoa(`${this.config.neo4jUsername}:${this.config.neo4jPassword}`);
 
         try {
+            const statementObj = {
+                statement: cypherQuery,
+                resultDataContents: ['row', 'graph'],
+                includeStats: true
+            };
+
+            // Add parameters if provided
+            if (parameters && Object.keys(parameters).length > 0) {
+                statementObj.parameters = parameters;
+            }
+
             const response = await fetch(this.config.neo4jUrl, {
                 method: 'POST',
                 headers: {
@@ -113,11 +124,7 @@ class Neo4jManager {
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({
-                    statements: [{
-                        statement: cypherQuery,
-                        resultDataContents: ['row', 'graph'],
-                        includeStats: true
-                    }]
+                    statements: [statementObj]
                 })
             });
 
