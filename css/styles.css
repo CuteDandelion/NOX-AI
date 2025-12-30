@@ -3149,6 +3149,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    background: transparent;
 }
 
 .chat-section.centered .chat-messages {
@@ -3161,8 +3162,23 @@ body {
     left: 50%;
     transform: translate(-50%, -50%);
     width: 90%;
-    max-width: 800px;
+    max-width: 700px;
     z-index: 10;
+    border-radius: 50px;
+    padding: 8px;
+    background: rgba(30, 33, 38, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139, 148, 158, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.chat-section.centered .chat-input {
+    border-radius: 40px;
+    background: rgba(40, 43, 48, 0.6);
+}
+
+.chat-section.centered .send-button {
+    border-radius: 50%;
 }
 
 /* Bottom State (After first message) */
@@ -3182,6 +3198,12 @@ body {
     transform: none;
     width: 100%;
     max-width: none;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    backdrop-filter: none;
+    border: none;
+    box-shadow: none;
 }
 
 /* ==================== Inline Autocomplete (Ghost Text) ====================  */
