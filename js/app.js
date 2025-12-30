@@ -83,6 +83,11 @@ class NOXApp {
         this.selectedSkillToEdit = null;
         this.selectedSkillToDelete = null;
 
+        // Initialize Skill Prompting
+        this.selectedSkillsForPrompt = [];
+        this.skillSelectorSearchQuery = '';
+        this.currentWizardSkill = null;
+
         // Setup event listeners
         this.setupEventListeners();
         this.setupScrollDetection();
@@ -124,6 +129,9 @@ class NOXApp {
 
         // Skills Library
         this.setupSkillsLibrary();
+
+        // Skill-Based Prompting
+        this.setupSkillPrompting();
 
         // Settings
         document.getElementById('settingsButton').addEventListener('click', () => this.openSettings());
@@ -1002,6 +1010,349 @@ class NOXApp {
             console.error('Delete skill error:', error);
             this.addSystemMessage(`❌ Delete failed: ${error.message}`);
         }
+    }
+
+    // ==================== Skill-Based Prompting ====================
+
+    setupSkillPrompting() {
+        const skillSelectorButton = document.getElementById('skillSelectorButton');
+        const skillSelectorMenu = document.getElementById('skillSelectorMenu');
+        const skillSelectorSearch = document.getElementById('skillSelectorSearch');
+
+        // Toggle skill selector menu
+        skillSelectorButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isVisible = skillSelectorMenu.style.display === 'block';
+            skillSelectorMenu.style.display = isVisible ? 'none' : 'block';
+
+            if (!isVisible) {
+                this.loadSkillsForSelector();
+            }
+        });
+
+        // Search skills in selector
+        skillSelectorSearch.addEventListener('input', (e) => {
+            this.skillSelectorSearchQuery = e.target.value;
+            this.renderSkillSelectorList();
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!skillSelectorButton.contains(e.target) && !skillSelectorMenu.contains(e.target)) {
+                skillSelectorMenu.style.display = 'none';
+            }
+        });
+
+        // Setup parameter wizard modal
+        this.setupParameterWizard();
+    }
+
+    async loadSkillsForSelector() {
+        const skillSelectorList = document.getElementById('skillSelectorList');
+
+        try {
+            // Load skills if not already loaded
+            if (this.skillLibraryManager.skills.length === 0) {
+                skillSelectorList.innerHTML = '<div class="skill-selector-placeholder"><p>Loading...</p></div>';
+                await this.skillLibraryManager.loadSkills();
+            }
+
+            this.renderSkillSelectorList();
+        } catch (error) {
+            console.error('Load skills for selector error:', error);
+            skillSelectorList.innerHTML = '<div class="skill-selector-placeholder"><p style="color: #ff6b6b;">Failed to load skills</p></div>';
+        }
+    }
+
+    renderSkillSelectorList() {
+        const skillSelectorList = document.getElementById('skillSelectorList');
+        const query = this.skillSelectorSearchQuery.toLowerCase();
+
+        // Filter skills
+        let skills = this.skillLibraryManager.skills;
+        if (query) {
+            skills = skills.filter(skill =>
+                skill.name.toLowerCase().includes(query) ||
+                skill.description.toLowerCase().includes(query) ||
+                (skill.triggers && skill.triggers.some(t => t.toLowerCase().includes(query)))
+            );
+        }
+
+        if (skills.length === 0) {
+            skillSelectorList.innerHTML = '<div class="skill-selector-placeholder"><p>No skills found</p></div>';
+            return;
+        }
+
+        skillSelectorList.innerHTML = '';
+
+        skills.forEach(skill => {
+            const item = document.createElement('div');
+            item.className = 'skill-selector-item';
+
+            const name = document.createElement('div');
+            name.className = 'skill-selector-item-name';
+            name.textContent = skill.name;
+
+            const desc = document.createElement('div');
+            desc.className = 'skill-selector-item-desc';
+            desc.textContent = skill.description;
+
+            const triggersContainer = document.createElement('div');
+            triggersContainer.className = 'skill-selector-item-triggers';
+
+            const triggers = Array.isArray(skill.triggers) ? skill.triggers : [];
+            triggers.slice(0, 3).forEach(trigger => {
+                const tag = document.createElement('span');
+                tag.className = 'skill-selector-trigger';
+                tag.textContent = trigger;
+                triggersContainer.appendChild(tag);
+            });
+
+            item.appendChild(name);
+            item.appendChild(desc);
+            if (triggers.length > 0) {
+                item.appendChild(triggersContainer);
+            }
+
+            // Click to select skill
+            item.addEventListener('click', () => {
+                this.selectSkill(skill);
+            });
+
+            skillSelectorList.appendChild(item);
+        });
+    }
+
+    selectSkill(skill) {
+        // Close selector menu
+        document.getElementById('skillSelectorMenu').style.display = 'none';
+
+        // Check if skill has parameters
+        const parameters = this.extractParametersFromCypher(skill.cypher_template);
+
+        if (parameters.length > 0) {
+            // Open parameter wizard
+            this.openParameterWizard(skill, parameters);
+        } else {
+            // Generate prompt directly (no parameters needed)
+            this.generatePromptFromSkill(skill, {});
+        }
+    }
+
+    extractParametersFromCypher(cypherTemplate) {
+        // Extract $paramName from Cypher template
+        const paramRegex = /\$(\w+)/g;
+        const params = [];
+        let match;
+
+        while ((match = paramRegex.exec(cypherTemplate)) !== null) {
+            const paramName = match[1];
+            if (!params.find(p => p.name === paramName)) {
+                params.push({
+                    name: paramName,
+                    required: true,
+                    hint: `Value for ${paramName}`
+                });
+            }
+        }
+
+        return params;
+    }
+
+    // ==================== Parameter Wizard ====================
+
+    setupParameterWizard() {
+        const modal = document.getElementById('parameterWizardModal');
+        const closeBtn = document.getElementById('closeWizardModal');
+        const cancelBtn = document.getElementById('cancelWizard');
+        const generateBtn = document.getElementById('generatePrompt');
+
+        // Close modal handlers
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.currentWizardSkill = null;
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            this.currentWizardSkill = null;
+        });
+
+        // Generate prompt
+        generateBtn.addEventListener('click', () => this.generatePromptFromWizard());
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                this.currentWizardSkill = null;
+            }
+        });
+    }
+
+    openParameterWizard(skill, parameters) {
+        this.currentWizardSkill = skill;
+
+        const modal = document.getElementById('parameterWizardModal');
+        const skillNameEl = document.getElementById('wizardSkillName');
+        const skillDescEl = document.getElementById('wizardSkillDescription');
+        const formEl = document.getElementById('wizardParametersForm');
+
+        skillNameEl.textContent = skill.name;
+        skillDescEl.textContent = skill.description;
+
+        // Build parameter form
+        formEl.innerHTML = '';
+
+        parameters.forEach(param => {
+            const group = document.createElement('div');
+            group.className = 'wizard-param-group';
+
+            const label = document.createElement('label');
+            label.className = 'wizard-param-label';
+            label.textContent = param.name;
+            if (param.required) {
+                const required = document.createElement('span');
+                required.className = 'required';
+                required.textContent = '*';
+                label.appendChild(required);
+            }
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'wizard-param-input';
+            input.id = `wizard-param-${param.name}`;
+            input.placeholder = `Enter ${param.name}...`;
+            input.required = param.required;
+
+            if (param.hint) {
+                const hint = document.createElement('div');
+                hint.className = 'wizard-param-hint';
+                hint.textContent = param.hint;
+                group.appendChild(label);
+                group.appendChild(input);
+                group.appendChild(hint);
+            } else {
+                group.appendChild(label);
+                group.appendChild(input);
+            }
+
+            formEl.appendChild(group);
+        });
+
+        modal.classList.remove('hidden');
+    }
+
+    generatePromptFromWizard() {
+        if (!this.currentWizardSkill) return;
+
+        const formEl = document.getElementById('wizardParametersForm');
+        const inputs = formEl.querySelectorAll('.wizard-param-input');
+        const paramValues = {};
+
+        // Collect parameter values
+        let isValid = true;
+        inputs.forEach(input => {
+            const paramName = input.id.replace('wizard-param-', '');
+            const value = input.value.trim();
+
+            if (input.required && !value) {
+                input.style.borderColor = '#ff6b6b';
+                isValid = false;
+            } else {
+                input.style.borderColor = '';
+                paramValues[paramName] = value;
+            }
+        });
+
+        if (!isValid) {
+            return;
+        }
+
+        // Generate prompt
+        this.generatePromptFromSkill(this.currentWizardSkill, paramValues);
+
+        // Close modal
+        document.getElementById('parameterWizardModal').classList.add('hidden');
+        this.currentWizardSkill = null;
+    }
+
+    generatePromptFromSkill(skill, paramValues) {
+        // Create a natural language prompt based on skill and parameters
+        let prompt = `Using the "${skill.name}" skill: ${skill.description}`;
+
+        if (Object.keys(paramValues).length > 0) {
+            prompt += '\n\nParameters:';
+            for (const [key, value] of Object.entries(paramValues)) {
+                prompt += `\n- ${key}: ${value}`;
+            }
+        }
+
+        // Set prompt in chat input
+        const chatInput = document.getElementById('chatInput');
+        chatInput.value = prompt;
+
+        // Add skill chip
+        this.addSkillChip(skill);
+
+        // Auto-resize textarea
+        chatInput.style.height = 'auto';
+        chatInput.style.height = chatInput.scrollHeight + 'px';
+
+        // Focus on input
+        chatInput.focus();
+
+        // Show success message
+        this.addSystemMessage(`✨ Generated prompt for "${skill.name}" skill`);
+    }
+
+    addSkillChip(skill) {
+        // Check if already added
+        if (this.selectedSkillsForPrompt.find(s => s.id === skill.id)) {
+            return;
+        }
+
+        this.selectedSkillsForPrompt.push(skill);
+        this.renderSkillChips();
+    }
+
+    removeSkillChip(skillId) {
+        this.selectedSkillsForPrompt = this.selectedSkillsForPrompt.filter(s => s.id !== skillId);
+        this.renderSkillChips();
+    }
+
+    renderSkillChips() {
+        const skillChipsContainer = document.getElementById('skillChips');
+
+        if (this.selectedSkillsForPrompt.length === 0) {
+            skillChipsContainer.style.display = 'none';
+            return;
+        }
+
+        skillChipsContainer.style.display = 'flex';
+        skillChipsContainer.innerHTML = '';
+
+        this.selectedSkillsForPrompt.forEach(skill => {
+            const chip = document.createElement('div');
+            chip.className = 'skill-chip';
+
+            const name = document.createElement('span');
+            name.className = 'skill-chip-name';
+            name.textContent = skill.name;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'skill-chip-remove';
+            removeBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeSkillChip(skill.id);
+            });
+
+            chip.appendChild(name);
+            chip.appendChild(removeBtn);
+
+            skillChipsContainer.appendChild(chip);
+        });
     }
 
     // ==================== Chat Management ====================

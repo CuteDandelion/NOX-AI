@@ -144,6 +144,25 @@
             </button>
         </div>
 
+        <!-- Skill Selector Menu -->
+        <div id="skillSelectorMenu" class="skill-selector-menu" style="display: none;">
+            <div class="skill-selector-header">
+                <span>Select a Skill</span>
+                <input
+                    type="text"
+                    id="skillSelectorSearch"
+                    class="skill-selector-search"
+                    placeholder="Search skills..."
+                    autocomplete="off"
+                />
+            </div>
+            <div id="skillSelectorList" class="skill-selector-list">
+                <div class="skill-selector-placeholder">
+                    <p>Loading skills...</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Area -->
         <div class="main-area">
                 <!-- Chat Section -->
@@ -163,6 +182,9 @@
                     <div class="chat-input-container">
                         <!-- Attached Files Preview - Inline -->
                         <div id="attachedFiles" class="attached-files" style="display: none;"></div>
+
+                        <!-- Skill Chips Container -->
+                        <div id="skillChips" class="skill-chips-container" style="display: none;"></div>
 
                         <div class="input-actions">
                             <button id="attachButton" class="action-button" title="Attach file or image">
@@ -186,6 +208,13 @@
                             data-1p-ignore="true"
                         ></textarea>
                         <div class="input-actions">
+                            <button id="skillSelectorButton" class="action-button" title="Use Skill">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    <path d="M12 2a10 10 0 0 0 0 20" stroke-dasharray="3 3" opacity="0.5"></path>
+                                </svg>
+                            </button>
                             <button id="voiceButton" class="action-button" title="Voice input">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"></path>
@@ -652,6 +681,31 @@
             <div class="modal-footer">
                 <button id="cancelDeleteSkill" class="btn-secondary">Cancel</button>
                 <button id="confirmDeleteSkill" class="btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parameter Wizard Modal -->
+    <div id="parameterWizardModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="wizardSkillName">Configure Skill Parameters</h3>
+                <button id="closeWizardModal" class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="wizardSkillDescription" style="color: var(--text-secondary); margin-bottom: 20px;"></p>
+                <div id="wizardParametersForm" class="wizard-parameters-form">
+                    <!-- Parameters will be dynamically generated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelWizard" class="btn-secondary">Cancel</button>
+                <button id="generatePrompt" class="btn-primary">Generate Prompt</button>
             </div>
         </div>
     </div>
