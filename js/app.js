@@ -692,9 +692,7 @@ class NOXApp {
         this.setupEditSkillModal();
         this.setupDeleteSkillModal();
 
-        // Make window draggable (reuse existing functionality from Graph View)
-        this.makeWindowDraggable(skillsLibraryWindow);
-        this.makeWindowResizable(skillsLibraryWindow);
+        // Note: Window dragging/resizing can be added via setupWindowDragResize() if needed
     }
 
     async loadAndDisplaySkills() {
