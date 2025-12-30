@@ -96,8 +96,6 @@ class NOXApp {
             { command: '/export-chat', description: 'Export current conversation' },
             { command: '/use-skill', description: 'Use a skill for prompting' }
         ];
-        this.autocompleteIndex = -1;
-        this.autocompleteSuggestions = [];
 
         // Setup event listeners
         this.setupEventListeners();
@@ -1427,43 +1425,28 @@ class NOXApp {
 
     setupAutocomplete() {
         const chatInput = document.getElementById('chatInput');
-        const autocompleteDropdown = document.getElementById('autocompleteDropdown');
+        const ghostText = document.getElementById('inlineGhostText');
 
-        if (!chatInput || !autocompleteDropdown) {
+        if (!chatInput || !ghostText) {
             console.warn('Autocomplete elements not found, skipping setup');
             return;
         }
 
-        // Show autocomplete on input
+        this.currentSuggestion = null;
+
+        // Show inline ghost text on input
         chatInput.addEventListener('input', (e) => {
-            this.handleAutocompleteInput(e.target.value);
+            this.updateInlineGhostText(e.target.value);
         });
 
-        // Handle keyboard navigation
+        // Handle Tab to accept, Esc to dismiss
         chatInput.addEventListener('keydown', (e) => {
-            const dropdown = document.getElementById('autocompleteDropdown');
-            if (!dropdown || dropdown.style.display === 'none') return;
-
-            if (e.key === 'ArrowDown') {
+            if (e.key === 'Tab' && this.currentSuggestion) {
                 e.preventDefault();
-                this.navigateAutocomplete(1);
-            } else if (e.key === 'ArrowUp') {
+                this.acceptInlineSuggestion();
+            } else if (e.key === 'Escape' && this.currentSuggestion) {
                 e.preventDefault();
-                this.navigateAutocomplete(-1);
-            } else if (e.key === 'Enter' && this.autocompleteIndex >= 0) {
-                e.preventDefault();
-                this.selectAutocompleteSuggestion(this.autocompleteSuggestions[this.autocompleteIndex]);
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                this.hideAutocomplete();
-            }
-        });
-
-        // Hide autocomplete when clicking outside
-        document.addEventListener('click', (e) => {
-            if (chatInput && autocompleteDropdown &&
-                !chatInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
-                this.hideAutocomplete();
+                this.clearInlineGhostText();
             }
         });
 
@@ -1481,213 +1464,118 @@ class NOXApp {
         }
     }
 
-    handleAutocompleteInput(value) {
+    updateInlineGhostText(value) {
+        const ghostText = document.getElementById('inlineGhostText');
+        const chatInput = document.getElementById('chatInput');
+
         if (!value || value.trim() === '') {
-            this.hideAutocomplete();
+            this.clearInlineGhostText();
             return;
         }
 
-        const suggestions = [];
+        let bestSuggestion = null;
 
-        // Check for slash commands
+        // Priority 1: Check for slash commands
         if (value.startsWith('/')) {
-            const matchingCommands = this.slashCommands.filter(cmd =>
-                cmd.command.startsWith(value.toLowerCase())
+            const matchingCommand = this.slashCommands.find(cmd =>
+                cmd.command.startsWith(value.toLowerCase()) && cmd.command !== value.toLowerCase()
             );
 
-            matchingCommands.forEach(cmd => {
-                suggestions.push({
+            if (matchingCommand) {
+                bestSuggestion = {
                     type: 'command',
-                    icon: '⚡',
-                    title: cmd.command,
-                    description: cmd.description,
-                    value: cmd.command
-                });
-            });
+                    text: matchingCommand.command,
+                    value: matchingCommand.command
+                };
+            }
         }
 
-        // Check for skill triggers
-        const lowerValue = value.toLowerCase();
-        const matchingSkills = this.skillLibraryManager.skills.filter(skill => {
-            if (!skill.triggers) return false;
-            return skill.triggers.some(trigger =>
-                trigger.toLowerCase().includes(lowerValue) ||
-                lowerValue.includes(trigger.toLowerCase())
+        // Priority 2: Check for skill triggers
+        if (!bestSuggestion) {
+            const lowerValue = value.toLowerCase();
+            const matchingSkill = this.skillLibraryManager.skills.find(skill => {
+                if (!skill.triggers) return false;
+                return skill.triggers.some(trigger =>
+                    trigger.toLowerCase().startsWith(lowerValue)
+                );
+            });
+
+            if (matchingSkill) {
+                // Find the matching trigger
+                const matchingTrigger = matchingSkill.triggers.find(trigger =>
+                    trigger.toLowerCase().startsWith(lowerValue)
+                );
+
+                if (matchingTrigger && matchingTrigger.toLowerCase() !== lowerValue) {
+                    bestSuggestion = {
+                        type: 'skill',
+                        text: matchingTrigger,
+                        value: matchingSkill,
+                        isSkill: true
+                    };
+                }
+            }
+        }
+
+        // Priority 3: Check for recent queries
+        if (!bestSuggestion) {
+            const lowerValue = value.toLowerCase();
+            const matchingQuery = this.recentQueries.find(query =>
+                query.toLowerCase().startsWith(lowerValue) && query.toLowerCase() !== lowerValue
             );
-        });
 
-        matchingSkills.slice(0, 5).forEach(skill => {
-            suggestions.push({
-                type: 'skill',
-                icon: '🎯',
-                title: skill.name,
-                description: skill.description,
-                value: skill,
-                isSkill: true
-            });
-        });
+            if (matchingQuery) {
+                bestSuggestion = {
+                    type: 'recent',
+                    text: matchingQuery,
+                    value: matchingQuery
+                };
+            }
+        }
 
-        // Check for recent queries
-        const matchingQueries = this.recentQueries.filter(query =>
-            query.toLowerCase().includes(lowerValue)
-        );
+        // Display ghost text if we have a suggestion
+        if (bestSuggestion) {
+            this.currentSuggestion = bestSuggestion;
 
-        matchingQueries.slice(0, 5).forEach(query => {
-            suggestions.push({
-                type: 'recent',
-                icon: '🕐',
-                title: query,
-                description: 'Recent query',
-                value: query
-            });
-        });
-
-        if (suggestions.length > 0) {
-            this.showAutocomplete(suggestions);
+            // Create ghost text with user input + suggestion
+            const suggestionRemainder = bestSuggestion.text.substring(value.length);
+            ghostText.innerHTML = `${value}<span class="ghost-suggestion">${suggestionRemainder}</span>`;
         } else {
-            this.hideAutocomplete();
+            this.clearInlineGhostText();
         }
     }
 
-    showAutocomplete(suggestions) {
-        this.autocompleteSuggestions = suggestions;
-        this.autocompleteIndex = -1;
+    acceptInlineSuggestion() {
+        if (!this.currentSuggestion) return;
 
-        const dropdown = document.getElementById('autocompleteDropdown');
-        dropdown.innerHTML = '';
-
-        // Group suggestions by type
-        const commandSuggestions = suggestions.filter(s => s.type === 'command');
-        const skillSuggestions = suggestions.filter(s => s.type === 'skill');
-        const recentSuggestions = suggestions.filter(s => s.type === 'recent');
-
-        // Add slash commands section
-        if (commandSuggestions.length > 0) {
-            const section = this.createAutocompleteSection('Commands', commandSuggestions);
-            dropdown.appendChild(section);
-        }
-
-        // Add skills section
-        if (skillSuggestions.length > 0) {
-            if (commandSuggestions.length > 0) {
-                const separator = document.createElement('div');
-                separator.className = 'autocomplete-separator';
-                dropdown.appendChild(separator);
-            }
-
-            const section = this.createAutocompleteSection('Skills', skillSuggestions);
-            dropdown.appendChild(section);
-        }
-
-        // Add recent queries section
-        if (recentSuggestions.length > 0) {
-            if (commandSuggestions.length > 0 || skillSuggestions.length > 0) {
-                const separator = document.createElement('div');
-                separator.className = 'autocomplete-separator';
-                dropdown.appendChild(separator);
-            }
-
-            const section = this.createAutocompleteSection('Recent Queries', recentSuggestions);
-            dropdown.appendChild(section);
-        }
-
-        dropdown.style.display = 'block';
-    }
-
-    createAutocompleteSection(title, suggestions) {
-        const section = document.createElement('div');
-        section.className = 'autocomplete-section';
-
-        const header = document.createElement('div');
-        header.className = 'autocomplete-section-header';
-        header.textContent = title;
-        section.appendChild(header);
-
-        suggestions.forEach((suggestion, index) => {
-            const item = document.createElement('div');
-            item.className = 'autocomplete-item';
-            item.dataset.index = this.autocompleteSuggestions.indexOf(suggestion);
-
-            const icon = document.createElement('div');
-            icon.className = 'autocomplete-item-icon';
-            icon.textContent = suggestion.icon;
-
-            const content = document.createElement('div');
-            content.className = 'autocomplete-item-content';
-
-            const titleEl = document.createElement('div');
-            titleEl.className = 'autocomplete-item-title';
-            titleEl.textContent = suggestion.title;
-
-            const descEl = document.createElement('div');
-            descEl.className = 'autocomplete-item-desc';
-            descEl.textContent = suggestion.description;
-
-            content.appendChild(titleEl);
-            content.appendChild(descEl);
-
-            item.appendChild(icon);
-            item.appendChild(content);
-
-            item.addEventListener('click', () => {
-                this.selectAutocompleteSuggestion(suggestion);
-            });
-
-            section.appendChild(item);
-        });
-
-        return section;
-    }
-
-    navigateAutocomplete(direction) {
-        const items = document.querySelectorAll('.autocomplete-item');
-        if (items.length === 0) return;
-
-        // Remove active class from current item
-        if (this.autocompleteIndex >= 0 && this.autocompleteIndex < items.length) {
-            items[this.autocompleteIndex].classList.remove('active');
-        }
-
-        // Update index
-        this.autocompleteIndex += direction;
-
-        // Wrap around
-        if (this.autocompleteIndex < 0) {
-            this.autocompleteIndex = items.length - 1;
-        } else if (this.autocompleteIndex >= items.length) {
-            this.autocompleteIndex = 0;
-        }
-
-        // Add active class to new item
-        items[this.autocompleteIndex].classList.add('active');
-
-        // Scroll into view
-        items[this.autocompleteIndex].scrollIntoView({
-            block: 'nearest',
-            behavior: 'smooth'
-        });
-    }
-
-    selectAutocompleteSuggestion(suggestion) {
         const chatInput = document.getElementById('chatInput');
 
-        if (suggestion.type === 'command') {
+        if (this.currentSuggestion.type === 'command') {
             // Handle slash commands
-            this.handleSlashCommand(suggestion.value);
-        } else if (suggestion.type === 'skill' && suggestion.isSkill) {
+            this.handleSlashCommand(this.currentSuggestion.value);
+        } else if (this.currentSuggestion.type === 'skill' && this.currentSuggestion.isSkill) {
             // Handle skill selection
-            this.selectSkill(suggestion.value);
+            this.selectSkill(this.currentSuggestion.value);
+            chatInput.value = '';
         } else {
             // Insert text suggestion
-            chatInput.value = suggestion.value;
-
-            // Auto-resize textarea
-            chatInput.style.height = 'auto';
-            chatInput.style.height = chatInput.scrollHeight + 'px';
+            chatInput.value = this.currentSuggestion.text;
         }
 
-        this.hideAutocomplete();
+        // Auto-resize textarea
+        chatInput.style.height = 'auto';
+        chatInput.style.height = chatInput.scrollHeight + 'px';
+
+        this.clearInlineGhostText();
         chatInput.focus();
+    }
+
+    clearInlineGhostText() {
+        const ghostText = document.getElementById('inlineGhostText');
+        if (ghostText) {
+            ghostText.innerHTML = '';
+        }
+        this.currentSuggestion = null;
     }
 
     handleSlashCommand(command) {
@@ -1721,13 +1609,6 @@ class NOXApp {
         // Auto-resize textarea
         chatInput.style.height = 'auto';
         chatInput.style.height = chatInput.scrollHeight + 'px';
-    }
-
-    hideAutocomplete() {
-        const dropdown = document.getElementById('autocompleteDropdown');
-        dropdown.style.display = 'none';
-        this.autocompleteIndex = -1;
-        this.autocompleteSuggestions = [];
     }
 
     loadRecentQueries() {
