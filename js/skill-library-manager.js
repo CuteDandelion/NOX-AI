@@ -115,6 +115,12 @@ class SkillLibraryManager {
                 setStatements.push('s.triggers = $triggers');
                 params.triggers = Array.isArray(updates.triggers) ? updates.triggers : updates.triggers.split(',').map(t => t.trim());
             }
+            if (updates.workflow_template !== undefined) {
+                setStatements.push('s.workflow_template = $workflow_template');
+                // Ensure workflow_template is stored as JSON string
+                params.workflow_template = typeof updates.workflow_template === 'string' ?
+                    updates.workflow_template : JSON.stringify(updates.workflow_template);
+            }
             if (updates.cypher_template !== undefined) {
                 setStatements.push('s.cypher_template = $cypher_template');
                 params.cypher_template = updates.cypher_template;
