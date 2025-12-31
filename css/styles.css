@@ -3115,6 +3115,7 @@ body {
 
 .welcome-screen.hidden {
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
 }
 
@@ -3126,12 +3127,21 @@ body {
 .welcome-title {
     font-size: 72px;
     font-weight: 700;
+    color: #667eea;
     background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     margin: 0 0 20px 0;
     letter-spacing: -1px;
+}
+
+/* Fallback for browsers that don't support background-clip */
+@supports not (background-clip: text) {
+    .welcome-title {
+        color: var(--accent-primary);
+        background: none;
+    }
 }
 
 .welcome-subtitle {
@@ -3191,6 +3201,7 @@ body {
 /* Bottom State (After first message) */
 .chat-section.bottom .welcome-screen {
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
 }
 
