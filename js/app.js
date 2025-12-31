@@ -2541,14 +2541,14 @@ class NOXApp {
             'crafting response...'
         ];
 
-        const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+        let messageIndex = Math.floor(Math.random() * loadingMessages.length);
 
         messageEl.innerHTML = `
             <div class="message-avatar">${this.getAvatarHTML('assistant')}</div>
             <div class="message-content">
                 <div class="message-role">NOX.AI</div>
                 <div class="loading-indicator">
-                    <span class="loading-message">${randomMessage}</span>
+                    <span class="loading-message">${loadingMessages[messageIndex]}</span>
                     <div class="loading-dots">
                         <div class="loading-dot"></div>
                         <div class="loading-dot"></div>
@@ -2561,12 +2561,31 @@ class NOXApp {
         this.chatMessages.appendChild(messageEl);
         this.scrollToBottom();
 
+        // Rotate loading message every 1.5 seconds
+        const messageRotationInterval = setInterval(() => {
+            const loadingMessageEl = messageEl.querySelector('.loading-message');
+            if (!loadingMessageEl) {
+                clearInterval(messageRotationInterval);
+                return;
+            }
+
+            messageIndex = (messageIndex + 1) % loadingMessages.length;
+            loadingMessageEl.textContent = loadingMessages[messageIndex];
+        }, 1500);
+
+        // Store interval ID so we can clear it when removing the loading indicator
+        messageEl.dataset.rotationInterval = messageRotationInterval;
+
         return loadingId;
     }
 
     removeMessage(messageId) {
         const messageEl = document.getElementById(messageId);
         if (messageEl) {
+            // Clear rotation interval if it exists
+            if (messageEl.dataset.rotationInterval) {
+                clearInterval(parseInt(messageEl.dataset.rotationInterval));
+            }
             messageEl.remove();
         }
     }

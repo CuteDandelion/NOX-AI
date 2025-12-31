@@ -3,23 +3,23 @@
    Pure Dark/Light Mode
    ==================================== */
 
-/* Variables - Dark Mode Only */
+/* Variables - Dark Mode Only (Gemini-inspired) */
 :root {
-    --bg-primary: #0d0d0d;
-    --bg-secondary: #171717;
-    --bg-tertiary: #1f1f1f;
-    --bg-sidebar: #0a0a0a;
+    --bg-primary: #202124;
+    --bg-secondary: #28292c;
+    --bg-tertiary: #303134;
+    --bg-sidebar: #202124;
 
-    --text-primary: #ffffff;
-    --text-secondary: #a3a3a3;
-    --text-tertiary: #737373;
+    --text-primary: #e8eaed;
+    --text-secondary: #9aa0a6;
+    --text-tertiary: #5f6368;
 
-    --accent-primary: #7c3aed;
-    --accent-secondary: #a78bfa;
-    --accent-hover: #6d28d9;
+    --accent-primary: #8ab4f8;
+    --accent-secondary: #aecbfa;
+    --accent-hover: #669df6;
 
-    --border-color: #2d2d2d;
-    --border-hover: #404040;
+    --border-color: #3c4043;
+    --border-hover: #5f6368;
 
     /* Node colors */
     --node-running: #3b82f6;
@@ -301,7 +301,7 @@ body {
     max-width: none;
     margin: 0;
     min-width: 0;
-    background: #000000;
+    background: var(--bg-primary);
 }
 
 .chat-messages {
@@ -441,16 +441,16 @@ body {
 .message-text {
     font-size: 18px;
     line-height: 1.7;
-    color: rgba(255, 255, 255, 0.95);
+    color: var(--text-primary);
     background: transparent;
-    padding: 24px 32px;
-    border-radius: 24px;
+    padding: 24px 0;
+    border-radius: 0;
     box-shadow: none;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
     text-shadow: none;
-    animation: floatBubble 6s ease-in-out infinite;
+    animation: none;
 }
 
 /* Assistant message styling */
@@ -476,13 +476,13 @@ body {
 }
 
 .message.user-message .message-text {
-    background: #2a2a2a;
+    background: var(--bg-tertiary);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-left: none;
-    border-right: none;
-    color: rgba(255, 255, 255, 0.95);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    padding: 16px 20px;
+    color: var(--text-primary);
     font-weight: 400;
     box-shadow: none;
     text-shadow: none;
@@ -2773,6 +2773,20 @@ body {
     outline: none;
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.modal-input[readonly],
+.modal-textarea[readonly] {
+    background: rgba(60, 60, 60, 0.3);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+    border-color: rgba(139, 148, 158, 0.1);
+}
+
+.modal-input[readonly]:focus,
+.modal-textarea[readonly]:focus {
+    border-color: rgba(139, 148, 158, 0.2);
+    box-shadow: none;
 }
 
 .modal-textarea.code-editor {
