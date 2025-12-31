@@ -83,6 +83,9 @@ class NOXApp {
         this.selectedSkillToEdit = null;
         this.selectedSkillToDelete = null;
 
+        // Initialize Notification Manager
+        this.notificationManager = new NotificationManager();
+
         // Initialize Skill Prompting
         this.selectedSkillsForPrompt = [];
         this.skillSelectorSearchQuery = '';
@@ -672,10 +675,16 @@ class NOXApp {
     exportChat(format) {
         try {
             this.chatExporter.export(format);
-            this.addSystemMessage(`✅ Chat exported as ${format.toUpperCase()}`);
+            this.notificationManager.success(
+                'Export Successful',
+                `Chat exported as ${format.toUpperCase()}`
+            );
         } catch (error) {
             console.error('Export error:', error);
-            this.addSystemMessage(`❌ Export failed: ${error.message}`);
+            this.notificationManager.error(
+                'Export Failed',
+                error.message
+            );
         }
     }
 
@@ -894,40 +903,26 @@ class NOXApp {
         const closeBtn = document.getElementById('closeEditModal');
         const cancelBtn = document.getElementById('cancelEditSkill');
         const saveBtn = document.getElementById('saveEditSkill');
-        const revertBtn = document.getElementById('revertSkillJSON');
 
         // Close modal handlers
         closeBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
             this.selectedSkillToEdit = null;
-            this.originalSkillJSON = null;
         });
 
         cancelBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
             this.selectedSkillToEdit = null;
-            this.originalSkillJSON = null;
         });
 
         // Save changes
         saveBtn.addEventListener('click', () => this.saveSkillEdits());
-
-        // Revert changes
-        revertBtn.addEventListener('click', () => {
-            if (this.originalSkillJSON) {
-                document.getElementById('editSkillJSON').value = this.originalSkillJSON;
-                // Clear errors
-                document.getElementById('editSkillErrors').style.display = 'none';
-                document.getElementById('editSkillErrors').innerHTML = '';
-            }
-        });
 
         // Close on background click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');
                 this.selectedSkillToEdit = null;
-                this.originalSkillJSON = null;
             }
         });
     }
@@ -936,49 +931,54 @@ class NOXApp {
         this.selectedSkillToEdit = skill;
 
         const modal = document.getElementById('editSkillModal');
-        const jsonEditor = document.getElementById('editSkillJSON');
 
-        // Prepare skill object for editing - match actual Neo4j schema
-        const editableSkill = {
-            id: skill.id,
-            name: skill.name || '',
-            description: skill.description || '',
-            workflow_template: skill.workflow_template || {},
-            triggers: skill.triggers || [],
-            category: skill.category || '',
-            parameters: skill.parameters || {},
-            version: skill.version || 1,
-            usage_count: skill.usage_count || 0,
-            created_at: skill.created_at || '',
-            updated_at: skill.updated_at || ''
-        };
+        // Populate read-only fields
+        document.getElementById('editSkillId').value = skill.id || '';
+        document.getElementById('editSkillVersion').value = skill.version || 1;
+        document.getElementById('editSkillUsageCount').value = skill.usage_count || 0;
+        document.getElementById('editSkillCreatedAt').value = skill.created_at || '';
+        document.getElementById('editSkillUpdatedAt').value = skill.updated_at || '';
 
-        // Parse workflow_template if it's a string
+        // Populate editable fields
+        document.getElementById('editSkillName').value = skill.name || '';
+        document.getElementById('editSkillDescription').value = skill.description || '';
+        document.getElementById('editSkillCategory').value = skill.category || '';
+
+        // Triggers array to comma-separated string
+        const triggersStr = Array.isArray(skill.triggers) ? skill.triggers.join(', ') : '';
+        document.getElementById('editSkillTriggers').value = triggersStr;
+
+        // Workflow template - handle as JSON string
+        let workflowStr = '';
         try {
-            if (typeof editableSkill.workflow_template === 'string') {
-                editableSkill.workflow_template = JSON.parse(editableSkill.workflow_template);
+            if (typeof skill.workflow_template === 'string') {
+                // Parse and pretty-print if it's a JSON string
+                const parsed = JSON.parse(skill.workflow_template);
+                workflowStr = JSON.stringify(parsed, null, 2);
+            } else if (skill.workflow_template && typeof skill.workflow_template === 'object') {
+                // Pretty-print if it's already an object
+                workflowStr = JSON.stringify(skill.workflow_template, null, 2);
             }
         } catch (error) {
-            editableSkill.workflow_template = {};
+            workflowStr = skill.workflow_template || '{}';
         }
+        document.getElementById('editSkillWorkflow').value = workflowStr;
 
-        // Parse parameters if it's a string
+        // Parameters - handle as JSON string
+        let parametersStr = '';
         try {
-            if (typeof editableSkill.parameters === 'string') {
-                editableSkill.parameters = JSON.parse(editableSkill.parameters);
+            if (typeof skill.parameters === 'string') {
+                // Parse and pretty-print if it's a JSON string
+                const parsed = JSON.parse(skill.parameters);
+                parametersStr = JSON.stringify(parsed, null, 2);
+            } else if (skill.parameters && typeof skill.parameters === 'object') {
+                // Pretty-print if it's already an object
+                parametersStr = JSON.stringify(skill.parameters, null, 2);
             }
         } catch (error) {
-            editableSkill.parameters = {};
+            parametersStr = skill.parameters || '{}';
         }
-
-        // Convert to pretty-printed JSON
-        const prettyJSON = JSON.stringify(editableSkill, null, 2);
-
-        // Store original JSON for revert functionality
-        this.originalSkillJSON = prettyJSON;
-
-        // Populate JSON editor
-        jsonEditor.value = prettyJSON;
+        document.getElementById('editSkillParameters').value = parametersStr;
 
         // Clear errors
         document.getElementById('editSkillErrors').style.display = 'none';
@@ -991,43 +991,56 @@ class NOXApp {
     async saveSkillEdits() {
         if (!this.selectedSkillToEdit) return;
 
-        const jsonEditor = document.getElementById('editSkillJSON');
-        const jsonText = jsonEditor.value.trim();
-
         try {
-            // Parse JSON
-            const skillData = JSON.parse(jsonText);
+            // Get form values
+            const name = document.getElementById('editSkillName').value.trim();
+            const description = document.getElementById('editSkillDescription').value.trim();
+            const category = document.getElementById('editSkillCategory').value.trim();
+            const triggersStr = document.getElementById('editSkillTriggers').value.trim();
+            const workflowStr = document.getElementById('editSkillWorkflow').value.trim();
+            const parametersStr = document.getElementById('editSkillParameters').value.trim();
 
             // Validate required fields
-            if (!skillData.name || !skillData.name.trim()) {
+            if (!name) {
                 this.showEditSkillErrors(['Skill name is required']);
                 return;
             }
 
-            if (!skillData.workflow_template) {
+            if (!workflowStr) {
                 this.showEditSkillErrors(['Workflow template is required']);
+                return;
+            }
+
+            // Parse triggers (comma-separated to array)
+            const triggers = triggersStr ? triggersStr.split(',').map(t => t.trim()).filter(t => t) : [];
+
+            // Parse workflow template JSON
+            let workflowTemplate;
+            try {
+                workflowTemplate = JSON.parse(workflowStr);
+            } catch (e) {
+                this.showEditSkillErrors([`Invalid Workflow Template JSON: ${e.message}`]);
+                return;
+            }
+
+            // Parse parameters JSON
+            let parameters;
+            try {
+                parameters = parametersStr ? JSON.parse(parametersStr) : {};
+            } catch (e) {
+                this.showEditSkillErrors([`Invalid Parameters JSON: ${e.message}`]);
                 return;
             }
 
             // Prepare updates object
             const updates = {
-                name: skillData.name.trim(),
-                description: (skillData.description || '').trim(),
-                category: (skillData.category || '').trim(),
-                triggers: skillData.triggers || [],
-                workflow_template: skillData.workflow_template,
-                parameters: skillData.parameters || {}
+                name,
+                description,
+                category,
+                triggers,
+                workflow_template: workflowTemplate,
+                parameters
             };
-
-            // Validate parameters is valid JSON (if it's a string)
-            if (typeof updates.parameters === 'string') {
-                try {
-                    updates.parameters = JSON.parse(updates.parameters);
-                } catch (e) {
-                    this.showEditSkillErrors(['Parameters must be valid JSON']);
-                    return;
-                }
-            }
 
             // Validate with skill library manager
             const validation = this.skillLibraryManager.validateSkill(updates);
@@ -1042,24 +1055,24 @@ class NOXApp {
             // Close modal
             document.getElementById('editSkillModal').classList.add('hidden');
             this.selectedSkillToEdit = null;
-            this.originalSkillJSON = null;
 
             // Reload and display skills
             this.renderSkills();
             this.updateSkillsStats();
 
-            // Show success message
-            this.addSystemMessage(`✅ Skill "${updates.name}" updated successfully (v${updated.version})`);
+            // Show success notification
+            this.notificationManager.success(
+                'Skill Updated',
+                `"${updates.name}" updated successfully (v${updated.version})`
+            );
 
         } catch (error) {
             console.error('Save skill error:', error);
-
-            // Check if it's a JSON parse error
-            if (error instanceof SyntaxError) {
-                this.showEditSkillErrors([`Invalid JSON: ${error.message}`]);
-            } else {
-                this.showEditSkillErrors([error.message]);
-            }
+            this.notificationManager.error(
+                'Update Failed',
+                error.message
+            );
+            this.showEditSkillErrors([error.message]);
         }
     }
 
@@ -1129,15 +1142,24 @@ class NOXApp {
                 this.renderSkills();
                 this.updateSkillsStats();
 
-                // Show success message
-                this.addSystemMessage(`✅ Skill "${skillName}" deleted successfully`);
+                // Show success notification
+                this.notificationManager.success(
+                    'Skill Deleted',
+                    `"${skillName}" deleted successfully`
+                );
             } else {
-                this.addSystemMessage(`❌ Failed to delete skill "${skillName}"`);
+                this.notificationManager.error(
+                    'Delete Failed',
+                    `Failed to delete skill "${skillName}"`
+                );
             }
 
         } catch (error) {
             console.error('Delete skill error:', error);
-            this.addSystemMessage(`❌ Delete failed: ${error.message}`);
+            this.notificationManager.error(
+                'Delete Failed',
+                error.message
+            );
         }
     }
 
@@ -1262,8 +1284,8 @@ class NOXApp {
         // Close selector menu
         document.getElementById('skillSelectorMenu').style.display = 'none';
 
-        // Check if skill has parameters
-        const parameters = this.extractParametersFromCypher(skill.cypher_template);
+        // Check if skill has parameters (new schema)
+        const parameters = this.extractParametersFromSkill(skill);
 
         if (parameters.length > 0) {
             // Open parameter wizard
@@ -1274,21 +1296,36 @@ class NOXApp {
         }
     }
 
-    extractParametersFromCypher(cypherTemplate) {
-        // Extract $paramName from Cypher template
-        const paramRegex = /\$(\w+)/g;
+    extractParametersFromSkill(skill) {
+        // New schema: parameters is a JSON object
         const params = [];
-        let match;
 
-        while ((match = paramRegex.exec(cypherTemplate)) !== null) {
-            const paramName = match[1];
-            if (!params.find(p => p.name === paramName)) {
+        try {
+            let parametersObj = skill.parameters;
+
+            // If parameters is a JSON string, parse it
+            if (typeof parametersObj === 'string') {
+                parametersObj = JSON.parse(parametersObj);
+            }
+
+            // If no parameters object, return empty array
+            if (!parametersObj || typeof parametersObj !== 'object') {
+                return params;
+            }
+
+            // Convert parameters object to array format for wizard
+            for (const [paramName, paramConfig] of Object.entries(parametersObj)) {
                 params.push({
                     name: paramName,
-                    required: true,
-                    hint: `Value for ${paramName}`
+                    required: paramConfig.required !== false, // Default to true
+                    hint: paramConfig.description || `Enter ${paramName}`,
+                    type: paramConfig.type || 'string',
+                    default: paramConfig.default
                 });
             }
+
+        } catch (error) {
+            console.warn('Failed to extract parameters from skill:', error);
         }
 
         return params;
@@ -1345,7 +1382,7 @@ class NOXApp {
 
             const label = document.createElement('label');
             label.className = 'wizard-param-label';
-            label.textContent = param.name;
+            label.textContent = param.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             if (param.required) {
                 const required = document.createElement('span');
                 required.className = 'required';
@@ -1353,23 +1390,52 @@ class NOXApp {
                 label.appendChild(required);
             }
 
-            const input = document.createElement('input');
-            input.type = 'text';
+            // Create input based on type
+            let input;
+            const paramType = param.type || 'string';
+
+            if (paramType === 'number' || paramType === 'integer') {
+                input = document.createElement('input');
+                input.type = 'number';
+                if (paramType === 'integer') {
+                    input.step = '1';
+                }
+            } else if (paramType === 'boolean') {
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = param.default === true;
+            } else if (paramType === 'textarea' || paramType === 'text') {
+                input = document.createElement('textarea');
+                input.rows = 3;
+            } else {
+                // Default to text input
+                input = document.createElement('input');
+                input.type = 'text';
+            }
+
             input.className = 'wizard-param-input';
             input.id = `wizard-param-${param.name}`;
-            input.placeholder = `Enter ${param.name}...`;
             input.required = param.required;
 
+            // Set placeholder or default value
+            if (paramType === 'boolean') {
+                // Checkbox doesn't need placeholder
+            } else {
+                input.placeholder = `Enter ${param.name.replace(/_/g, ' ')}...`;
+                if (param.default !== undefined && param.default !== null) {
+                    input.value = param.default;
+                }
+            }
+
+            group.appendChild(label);
+            group.appendChild(input);
+
+            // Add hint if available
             if (param.hint) {
                 const hint = document.createElement('div');
                 hint.className = 'wizard-param-hint';
                 hint.textContent = param.hint;
-                group.appendChild(label);
-                group.appendChild(input);
                 group.appendChild(hint);
-            } else {
-                group.appendChild(label);
-                group.appendChild(input);
             }
 
             formEl.appendChild(group);
@@ -1389,18 +1455,38 @@ class NOXApp {
         let isValid = true;
         inputs.forEach(input => {
             const paramName = input.id.replace('wizard-param-', '');
-            const value = input.value.trim();
+            let value;
 
-            if (input.required && !value) {
-                input.style.borderColor = '#ff6b6b';
-                isValid = false;
-            } else {
-                input.style.borderColor = '';
+            // Handle different input types
+            if (input.type === 'checkbox') {
+                value = input.checked;
                 paramValues[paramName] = value;
+            } else if (input.type === 'number') {
+                value = input.value.trim();
+                if (input.required && !value) {
+                    input.style.borderColor = '#ff6b6b';
+                    isValid = false;
+                    return;
+                }
+                paramValues[paramName] = value ? parseFloat(value) : '';
+                input.style.borderColor = '';
+            } else {
+                value = input.value.trim();
+                if (input.required && !value) {
+                    input.style.borderColor = '#ff6b6b';
+                    isValid = false;
+                    return;
+                }
+                paramValues[paramName] = value;
+                input.style.borderColor = '';
             }
         });
 
         if (!isValid) {
+            this.notificationManager.warning(
+                'Missing Required Fields',
+                'Please fill in all required parameters'
+            );
             return;
         }
 
@@ -1437,8 +1523,12 @@ class NOXApp {
         // Focus on input
         chatInput.focus();
 
-        // Show success message
-        this.addSystemMessage(`✨ Generated prompt for "${skill.name}" skill`);
+        // Show success notification
+        this.notificationManager.info(
+            'Prompt Generated',
+            `Ready to execute "${skill.name}" skill`,
+            5000
+        );
     }
 
     addSkillChip(skill) {
@@ -2437,14 +2527,33 @@ class NOXApp {
         messageEl.className = 'message assistant-message';
         messageEl.id = loadingId;
 
+        // Fun loading messages (Gemini-style)
+        const loadingMessages = [
+            'cooking...',
+            'thinking hard...',
+            'why is it so slow...',
+            'still working on it...',
+            'almost there...',
+            'brewing magic...',
+            'just a moment...',
+            'processing thoughts...',
+            'hang tight...',
+            'crafting response...'
+        ];
+
+        const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+
         messageEl.innerHTML = `
             <div class="message-avatar">${this.getAvatarHTML('assistant')}</div>
             <div class="message-content">
                 <div class="message-role">NOX.AI</div>
                 <div class="loading-indicator">
-                    <div class="loading-dot"></div>
-                    <div class="loading-dot"></div>
-                    <div class="loading-dot"></div>
+                    <span class="loading-message">${randomMessage}</span>
+                    <div class="loading-dots">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
                 </div>
             </div>
         `;
@@ -2508,7 +2617,10 @@ class NOXApp {
         await neo4jManager.saveConfig(neo4jConfig);
 
         this.closeSettings();
-        this.addSystemMessage('Settings saved successfully! All configurations are now encrypted.');
+        this.notificationManager.success(
+            'Settings Saved',
+            'All configurations are now encrypted and saved'
+        );
     }
 
     async testN8nConnection() {
@@ -2629,7 +2741,10 @@ class NOXApp {
 
         // Check if Neo4j is configured
         if (!config.neo4jUrl || !config.neo4jUsername || !config.neo4jPassword) {
-            this.addSystemMessage('⚠️ Neo4j not configured. Please configure Neo4j settings first.');
+            this.notificationManager.warning(
+                'Neo4j Not Configured',
+                'Please configure Neo4j settings first'
+            );
             this.openSettings();
             return;
         }
