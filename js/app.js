@@ -113,15 +113,22 @@ class NOXApp {
 
     initializeWelcomeScreen() {
         const chatSection = document.querySelector('.chat-section');
+        const headerBar = document.querySelector('.header-bar');
         const messages = chatManager.getMessages();
 
         // Set initial state based on whether there are messages
         if (messages.length === 0) {
             chatSection.classList.add('centered');
-            chatSection.classList.remove('bottom');
+            chatSection.classList.remove('bottom', 'has-messages');
+            if (headerBar) {
+                headerBar.classList.remove('has-messages');
+            }
         } else {
-            chatSection.classList.add('bottom');
+            chatSection.classList.add('bottom', 'has-messages');
             chatSection.classList.remove('centered');
+            if (headerBar) {
+                headerBar.classList.add('has-messages');
+            }
             document.getElementById('welcomeScreen').classList.add('hidden');
         }
 
@@ -135,9 +142,16 @@ class NOXApp {
     transitionToChatMode() {
         const chatSection = document.querySelector('.chat-section');
         const welcomeScreen = document.getElementById('welcomeScreen');
+        const headerBar = document.querySelector('.header-bar');
 
         chatSection.classList.remove('centered');
         chatSection.classList.add('bottom');
+
+        // Add has-messages class for color transition
+        chatSection.classList.add('has-messages');
+        if (headerBar) {
+            headerBar.classList.add('has-messages');
+        }
 
         setTimeout(() => {
             welcomeScreen.classList.add('hidden');
