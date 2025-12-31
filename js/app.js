@@ -161,10 +161,16 @@ class NOXApp {
     transitionToWelcomeMode() {
         const chatSection = document.querySelector('.chat-section');
         const welcomeScreen = document.getElementById('welcomeScreen');
+        const headerBar = document.querySelector('.header-bar');
 
         welcomeScreen.classList.remove('hidden');
-        chatSection.classList.remove('bottom');
+        chatSection.classList.remove('bottom', 'has-messages');
         chatSection.classList.add('centered');
+
+        // Remove has-messages class to reset to black
+        if (headerBar) {
+            headerBar.classList.remove('has-messages');
+        }
     }
 
     setupEventListeners() {
