@@ -2527,14 +2527,33 @@ class NOXApp {
         messageEl.className = 'message assistant-message';
         messageEl.id = loadingId;
 
+        // Fun loading messages (Gemini-style)
+        const loadingMessages = [
+            'cooking...',
+            'thinking hard...',
+            'why is it so slow...',
+            'still working on it...',
+            'almost there...',
+            'brewing magic...',
+            'just a moment...',
+            'processing thoughts...',
+            'hang tight...',
+            'crafting response...'
+        ];
+
+        const randomMessage = loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+
         messageEl.innerHTML = `
             <div class="message-avatar">${this.getAvatarHTML('assistant')}</div>
             <div class="message-content">
                 <div class="message-role">NOX.AI</div>
                 <div class="loading-indicator">
-                    <div class="loading-dot"></div>
-                    <div class="loading-dot"></div>
-                    <div class="loading-dot"></div>
+                    <span class="loading-message">${randomMessage}</span>
+                    <div class="loading-dots">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
                 </div>
             </div>
         `;
