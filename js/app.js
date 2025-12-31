@@ -83,6 +83,9 @@ class NOXApp {
         this.selectedSkillToEdit = null;
         this.selectedSkillToDelete = null;
 
+        // Initialize Notification Manager
+        this.notificationManager = new NotificationManager();
+
         // Initialize Skill Prompting
         this.selectedSkillsForPrompt = [];
         this.skillSelectorSearchQuery = '';
@@ -672,10 +675,16 @@ class NOXApp {
     exportChat(format) {
         try {
             this.chatExporter.export(format);
-            this.addSystemMessage(`✅ Chat exported as ${format.toUpperCase()}`);
+            this.notificationManager.success(
+                'Export Successful',
+                `Chat exported as ${format.toUpperCase()}`
+            );
         } catch (error) {
             console.error('Export error:', error);
-            this.addSystemMessage(`❌ Export failed: ${error.message}`);
+            this.notificationManager.error(
+                'Export Failed',
+                error.message
+            );
         }
     }
 
@@ -1051,11 +1060,18 @@ class NOXApp {
             this.renderSkills();
             this.updateSkillsStats();
 
-            // Show success message
-            this.addSystemMessage(`✅ Skill "${updates.name}" updated successfully (v${updated.version})`);
+            // Show success notification
+            this.notificationManager.success(
+                'Skill Updated',
+                `"${updates.name}" updated successfully (v${updated.version})`
+            );
 
         } catch (error) {
             console.error('Save skill error:', error);
+            this.notificationManager.error(
+                'Update Failed',
+                error.message
+            );
             this.showEditSkillErrors([error.message]);
         }
     }
@@ -1126,15 +1142,24 @@ class NOXApp {
                 this.renderSkills();
                 this.updateSkillsStats();
 
-                // Show success message
-                this.addSystemMessage(`✅ Skill "${skillName}" deleted successfully`);
+                // Show success notification
+                this.notificationManager.success(
+                    'Skill Deleted',
+                    `"${skillName}" deleted successfully`
+                );
             } else {
-                this.addSystemMessage(`❌ Failed to delete skill "${skillName}"`);
+                this.notificationManager.error(
+                    'Delete Failed',
+                    `Failed to delete skill "${skillName}"`
+                );
             }
 
         } catch (error) {
             console.error('Delete skill error:', error);
-            this.addSystemMessage(`❌ Delete failed: ${error.message}`);
+            this.notificationManager.error(
+                'Delete Failed',
+                error.message
+            );
         }
     }
 
@@ -1434,8 +1459,12 @@ class NOXApp {
         // Focus on input
         chatInput.focus();
 
-        // Show success message
-        this.addSystemMessage(`✨ Generated prompt for "${skill.name}" skill`);
+        // Show success notification
+        this.notificationManager.info(
+            'Prompt Generated',
+            `Ready to execute "${skill.name}" skill`,
+            5000
+        );
     }
 
     addSkillChip(skill) {
@@ -2505,7 +2534,10 @@ class NOXApp {
         await neo4jManager.saveConfig(neo4jConfig);
 
         this.closeSettings();
-        this.addSystemMessage('Settings saved successfully! All configurations are now encrypted.');
+        this.notificationManager.success(
+            'Settings Saved',
+            'All configurations are now encrypted and saved'
+        );
     }
 
     async testN8nConnection() {
@@ -2626,7 +2658,10 @@ class NOXApp {
 
         // Check if Neo4j is configured
         if (!config.neo4jUrl || !config.neo4jUsername || !config.neo4jPassword) {
-            this.addSystemMessage('⚠️ Neo4j not configured. Please configure Neo4j settings first.');
+            this.notificationManager.warning(
+                'Neo4j Not Configured',
+                'Please configure Neo4j settings first'
+            );
             this.openSettings();
             return;
         }
