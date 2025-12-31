@@ -894,40 +894,26 @@ class NOXApp {
         const closeBtn = document.getElementById('closeEditModal');
         const cancelBtn = document.getElementById('cancelEditSkill');
         const saveBtn = document.getElementById('saveEditSkill');
-        const revertBtn = document.getElementById('revertSkillJSON');
 
         // Close modal handlers
         closeBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
             this.selectedSkillToEdit = null;
-            this.originalSkillJSON = null;
         });
 
         cancelBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
             this.selectedSkillToEdit = null;
-            this.originalSkillJSON = null;
         });
 
         // Save changes
         saveBtn.addEventListener('click', () => this.saveSkillEdits());
-
-        // Revert changes
-        revertBtn.addEventListener('click', () => {
-            if (this.originalSkillJSON) {
-                document.getElementById('editSkillJSON').value = this.originalSkillJSON;
-                // Clear errors
-                document.getElementById('editSkillErrors').style.display = 'none';
-                document.getElementById('editSkillErrors').innerHTML = '';
-            }
-        });
 
         // Close on background click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');
                 this.selectedSkillToEdit = null;
-                this.originalSkillJSON = null;
             }
         });
     }
@@ -936,49 +922,54 @@ class NOXApp {
         this.selectedSkillToEdit = skill;
 
         const modal = document.getElementById('editSkillModal');
-        const jsonEditor = document.getElementById('editSkillJSON');
 
-        // Prepare skill object for editing - match actual Neo4j schema
-        const editableSkill = {
-            id: skill.id,
-            name: skill.name || '',
-            description: skill.description || '',
-            workflow_template: skill.workflow_template || {},
-            triggers: skill.triggers || [],
-            category: skill.category || '',
-            parameters: skill.parameters || {},
-            version: skill.version || 1,
-            usage_count: skill.usage_count || 0,
-            created_at: skill.created_at || '',
-            updated_at: skill.updated_at || ''
-        };
+        // Populate read-only fields
+        document.getElementById('editSkillId').value = skill.id || '';
+        document.getElementById('editSkillVersion').value = skill.version || 1;
+        document.getElementById('editSkillUsageCount').value = skill.usage_count || 0;
+        document.getElementById('editSkillCreatedAt').value = skill.created_at || '';
+        document.getElementById('editSkillUpdatedAt').value = skill.updated_at || '';
 
-        // Parse workflow_template if it's a string
+        // Populate editable fields
+        document.getElementById('editSkillName').value = skill.name || '';
+        document.getElementById('editSkillDescription').value = skill.description || '';
+        document.getElementById('editSkillCategory').value = skill.category || '';
+
+        // Triggers array to comma-separated string
+        const triggersStr = Array.isArray(skill.triggers) ? skill.triggers.join(', ') : '';
+        document.getElementById('editSkillTriggers').value = triggersStr;
+
+        // Workflow template - handle as JSON string
+        let workflowStr = '';
         try {
-            if (typeof editableSkill.workflow_template === 'string') {
-                editableSkill.workflow_template = JSON.parse(editableSkill.workflow_template);
+            if (typeof skill.workflow_template === 'string') {
+                // Parse and pretty-print if it's a JSON string
+                const parsed = JSON.parse(skill.workflow_template);
+                workflowStr = JSON.stringify(parsed, null, 2);
+            } else if (skill.workflow_template && typeof skill.workflow_template === 'object') {
+                // Pretty-print if it's already an object
+                workflowStr = JSON.stringify(skill.workflow_template, null, 2);
             }
         } catch (error) {
-            editableSkill.workflow_template = {};
+            workflowStr = skill.workflow_template || '{}';
         }
+        document.getElementById('editSkillWorkflow').value = workflowStr;
 
-        // Parse parameters if it's a string
+        // Parameters - handle as JSON string
+        let parametersStr = '';
         try {
-            if (typeof editableSkill.parameters === 'string') {
-                editableSkill.parameters = JSON.parse(editableSkill.parameters);
+            if (typeof skill.parameters === 'string') {
+                // Parse and pretty-print if it's a JSON string
+                const parsed = JSON.parse(skill.parameters);
+                parametersStr = JSON.stringify(parsed, null, 2);
+            } else if (skill.parameters && typeof skill.parameters === 'object') {
+                // Pretty-print if it's already an object
+                parametersStr = JSON.stringify(skill.parameters, null, 2);
             }
         } catch (error) {
-            editableSkill.parameters = {};
+            parametersStr = skill.parameters || '{}';
         }
-
-        // Convert to pretty-printed JSON
-        const prettyJSON = JSON.stringify(editableSkill, null, 2);
-
-        // Store original JSON for revert functionality
-        this.originalSkillJSON = prettyJSON;
-
-        // Populate JSON editor
-        jsonEditor.value = prettyJSON;
+        document.getElementById('editSkillParameters').value = parametersStr;
 
         // Clear errors
         document.getElementById('editSkillErrors').style.display = 'none';
@@ -991,43 +982,56 @@ class NOXApp {
     async saveSkillEdits() {
         if (!this.selectedSkillToEdit) return;
 
-        const jsonEditor = document.getElementById('editSkillJSON');
-        const jsonText = jsonEditor.value.trim();
-
         try {
-            // Parse JSON
-            const skillData = JSON.parse(jsonText);
+            // Get form values
+            const name = document.getElementById('editSkillName').value.trim();
+            const description = document.getElementById('editSkillDescription').value.trim();
+            const category = document.getElementById('editSkillCategory').value.trim();
+            const triggersStr = document.getElementById('editSkillTriggers').value.trim();
+            const workflowStr = document.getElementById('editSkillWorkflow').value.trim();
+            const parametersStr = document.getElementById('editSkillParameters').value.trim();
 
             // Validate required fields
-            if (!skillData.name || !skillData.name.trim()) {
+            if (!name) {
                 this.showEditSkillErrors(['Skill name is required']);
                 return;
             }
 
-            if (!skillData.workflow_template) {
+            if (!workflowStr) {
                 this.showEditSkillErrors(['Workflow template is required']);
+                return;
+            }
+
+            // Parse triggers (comma-separated to array)
+            const triggers = triggersStr ? triggersStr.split(',').map(t => t.trim()).filter(t => t) : [];
+
+            // Parse workflow template JSON
+            let workflowTemplate;
+            try {
+                workflowTemplate = JSON.parse(workflowStr);
+            } catch (e) {
+                this.showEditSkillErrors([`Invalid Workflow Template JSON: ${e.message}`]);
+                return;
+            }
+
+            // Parse parameters JSON
+            let parameters;
+            try {
+                parameters = parametersStr ? JSON.parse(parametersStr) : {};
+            } catch (e) {
+                this.showEditSkillErrors([`Invalid Parameters JSON: ${e.message}`]);
                 return;
             }
 
             // Prepare updates object
             const updates = {
-                name: skillData.name.trim(),
-                description: (skillData.description || '').trim(),
-                category: (skillData.category || '').trim(),
-                triggers: skillData.triggers || [],
-                workflow_template: skillData.workflow_template,
-                parameters: skillData.parameters || {}
+                name,
+                description,
+                category,
+                triggers,
+                workflow_template: workflowTemplate,
+                parameters
             };
-
-            // Validate parameters is valid JSON (if it's a string)
-            if (typeof updates.parameters === 'string') {
-                try {
-                    updates.parameters = JSON.parse(updates.parameters);
-                } catch (e) {
-                    this.showEditSkillErrors(['Parameters must be valid JSON']);
-                    return;
-                }
-            }
 
             // Validate with skill library manager
             const validation = this.skillLibraryManager.validateSkill(updates);
@@ -1042,7 +1046,6 @@ class NOXApp {
             // Close modal
             document.getElementById('editSkillModal').classList.add('hidden');
             this.selectedSkillToEdit = null;
-            this.originalSkillJSON = null;
 
             // Reload and display skills
             this.renderSkills();
@@ -1053,13 +1056,7 @@ class NOXApp {
 
         } catch (error) {
             console.error('Save skill error:', error);
-
-            // Check if it's a JSON parse error
-            if (error instanceof SyntaxError) {
-                this.showEditSkillErrors([`Invalid JSON: ${error.message}`]);
-            } else {
-                this.showEditSkillErrors([error.message]);
-            }
+            this.showEditSkillErrors([error.message]);
         }
     }
 
