@@ -56,15 +56,22 @@ body {
 .header-bar {
     width: 100%;
     height: 60px;
-    background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 50%, #0d1b2a 100%);
-    border-bottom: 1px solid rgba(139, 192, 232, 0.2);
-    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(59, 130, 246, 0.1);
+    background: #000000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 24px;
     position: relative;
     z-index: 100;
+    transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+/* After first message state */
+.header-bar.has-messages {
+    background: #1a1a1a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .header-left {
@@ -73,24 +80,10 @@ body {
 }
 
 .header-bar .logo {
-    font-size: 22px;
-    font-weight: 700;
-    background: linear-gradient(135deg, #60a5fa 0%, #818cf8 50%, #c084fc 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.3));
+    font-size: 20px;
+    font-weight: 600;
+    color: #e8eaed;
     letter-spacing: 0.5px;
-    animation: logoGlow 3s ease-in-out infinite;
-}
-
-@keyframes logoGlow {
-    0%, 100% {
-        filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.3));
-    }
-    50% {
-        filter: drop-shadow(0 0 16px rgba(96, 165, 250, 0.5));
-    }
 }
 
 .header-right {
@@ -102,30 +95,26 @@ body {
 .icon-button {
     width: 40px;
     height: 40px;
-    background: rgba(30, 58, 138, 0.3);
-    border: 1px solid rgba(96, 165, 250, 0.3);
-    border-radius: 10px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #93c5fd;
-    transition: all 0.3s ease;
+    color: #9aa0a6;
+    transition: all 0.2s ease;
     position: relative;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.1);
 }
 
 .icon-button:hover {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: #60a5fa;
-    color: #60a5fa;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 20px rgba(96, 165, 250, 0.3), 0 0 30px rgba(96, 165, 250, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #e8eaed;
 }
 
 .icon-button:active {
-    transform: translateY(0);
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+    transform: scale(0.95);
 }
 
 .icon-button svg {
@@ -316,7 +305,13 @@ body {
     max-width: none;
     margin: 0;
     min-width: 0;
-    background: var(--bg-primary);
+    background: #000000;
+    transition: background 0.4s ease;
+}
+
+/* After first message state */
+.chat-section.has-messages {
+    background: #1a1a1a;
 }
 
 .chat-messages {
@@ -1169,8 +1164,8 @@ body {
    ==================================== */
 .execution-panel {
     width: 320px;
-    background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%);
-    border-left: 1px solid rgba(96, 165, 250, 0.2);
+    background: #202124;
+    border-left: 1px solid #3c4043;
     box-shadow: -2px 0 20px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
@@ -1197,23 +1192,23 @@ body {
     left: -12px;
     width: 24px;
     height: 24px;
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-    border: 1px solid rgba(96, 165, 250, 0.5);
+    background: #8ab4f8;
+    border: none;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     z-index: 10;
-    color: white;
+    color: #202124;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .execution-panel-toggle:hover {
-    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
-    transform: scale(1.15);
-    box-shadow: 0 4px 16px rgba(96, 165, 250, 0.5), 0 0 30px rgba(96, 165, 250, 0.3);
+    background: #aecbfa;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .execution-panel-toggle svg {
@@ -1228,16 +1223,14 @@ body {
 
 .execution-header {
     padding: 16px;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.2);
-    background: rgba(30, 58, 138, 0.2);
-    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #3c4043;
+    background: #28292c;
 }
 
 .execution-header h3 {
     font-size: 14px;
     font-weight: 600;
-    color: #93c5fd;
-    text-shadow: 0 0 10px rgba(147, 197, 253, 0.3);
+    color: #e8eaed;
 }
 
 .execution-content {
@@ -1432,16 +1425,16 @@ body {
 /* Workflow Selector */
 .workflow-selector {
     padding: 12px;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.15);
+    border-bottom: 1px solid #3c4043;
     display: flex;
     gap: 8px;
     align-items: flex-end;
-    background: rgba(13, 27, 42, 0.3);
+    background: #202124;
 }
 
 .workflow-selector label {
     font-size: 11px;
-    color: #7dd3fc;
+    color: #9aa0a6;
     margin-bottom: 4px;
     display: block;
 }
@@ -1449,10 +1442,10 @@ body {
 .workflow-dropdown {
     flex: 1;
     padding: 8px;
-    background: rgba(30, 58, 138, 0.3);
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    background: #303134;
+    border: 1px solid #5f6368;
     border-radius: 8px;
-    color: #bfdbfe;
+    color: #e8eaed;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1460,16 +1453,16 @@ body {
 
 .workflow-dropdown:focus {
     outline: none;
-    border-color: #60a5fa;
-    box-shadow: 0 0 10px rgba(96, 165, 250, 0.2);
+    border-color: #8ab4f8;
+    box-shadow: none;
 }
 
 .refresh-btn {
     padding: 8px;
-    background: rgba(30, 58, 138, 0.3);
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    background: #303134;
+    border: 1px solid #5f6368;
     border-radius: 8px;
-    color: #93c5fd;
+    color: #9aa0a6;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1478,11 +1471,9 @@ body {
 }
 
 .refresh-btn:hover {
-    background: rgba(59, 130, 246, 0.3);
-    color: #60a5fa;
-    border-color: #60a5fa;
-    box-shadow: 0 0 15px rgba(96, 165, 250, 0.2);
-    transform: scale(1.05);
+    background: #3c4043;
+    color: #e8eaed;
+    border-color: #8ab4f8;
 }
 
 /* Executions Section */
