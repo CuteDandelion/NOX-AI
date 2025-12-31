@@ -56,8 +56,9 @@ body {
 .header-bar {
     width: 100%;
     height: 60px;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
+    background: linear-gradient(135deg, #0d1b2a 0%, #1b263b 50%, #0d1b2a 100%);
+    border-bottom: 1px solid rgba(139, 192, 232, 0.2);
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.4), 0 0 40px rgba(59, 130, 246, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -72,13 +73,24 @@ body {
 }
 
 .header-bar .logo {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
-    color: var(--text-primary);
-    background: linear-gradient(135deg, var(--accent-primary) 0%, #a78bfa 100%);
+    background: linear-gradient(135deg, #60a5fa 0%, #818cf8 50%, #c084fc 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.3));
+    letter-spacing: 0.5px;
+    animation: logoGlow 3s ease-in-out infinite;
+}
+
+@keyframes logoGlow {
+    0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.3));
+    }
+    50% {
+        filter: drop-shadow(0 0 16px rgba(96, 165, 250, 0.5));
+    }
 }
 
 .header-right {
@@ -90,27 +102,30 @@ body {
 .icon-button {
     width: 40px;
     height: 40px;
-    background: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: rgba(30, 58, 138, 0.3);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--text-secondary);
-    transition: all 0.2s ease;
+    color: #93c5fd;
+    transition: all 0.3s ease;
     position: relative;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.1);
 }
 
 .icon-button:hover {
-    background: var(--bg-tertiary);
-    border-color: var(--accent-primary);
-    color: var(--accent-primary);
-    transform: translateY(-1px);
+    background: rgba(59, 130, 246, 0.2);
+    border-color: #60a5fa;
+    color: #60a5fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(96, 165, 250, 0.3), 0 0 30px rgba(96, 165, 250, 0.2);
 }
 
 .icon-button:active {
     transform: translateY(0);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
 }
 
 .icon-button svg {
@@ -1154,8 +1169,9 @@ body {
    ==================================== */
 .execution-panel {
     width: 320px;
-    background: var(--bg-sidebar);
-    border-left: 1px solid var(--border-color);
+    background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%);
+    border-left: 1px solid rgba(96, 165, 250, 0.2);
+    box-shadow: -2px 0 20px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
@@ -1181,8 +1197,8 @@ body {
     left: -12px;
     width: 24px;
     height: 24px;
-    background: var(--accent-primary);
-    border: none;
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    border: 1px solid rgba(96, 165, 250, 0.5);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1190,13 +1206,14 @@ body {
     cursor: pointer;
     z-index: 10;
     color: white;
-    transition: transform 0.3s ease, background 0.2s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.2);
 }
 
 .execution-panel-toggle:hover {
-    background: var(--accent-hover);
-    transform: scale(1.1);
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+    transform: scale(1.15);
+    box-shadow: 0 4px 16px rgba(96, 165, 250, 0.5), 0 0 30px rgba(96, 165, 250, 0.3);
 }
 
 .execution-panel-toggle svg {
@@ -1211,14 +1228,16 @@ body {
 
 .execution-header {
     padding: 16px;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-secondary);
+    border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+    background: rgba(30, 58, 138, 0.2);
+    backdrop-filter: blur(10px);
 }
 
 .execution-header h3 {
     font-size: 14px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #93c5fd;
+    text-shadow: 0 0 10px rgba(147, 197, 253, 0.3);
 }
 
 .execution-content {
@@ -1413,15 +1432,16 @@ body {
 /* Workflow Selector */
 .workflow-selector {
     padding: 12px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(96, 165, 250, 0.15);
     display: flex;
     gap: 8px;
     align-items: flex-end;
+    background: rgba(13, 27, 42, 0.3);
 }
 
 .workflow-selector label {
     font-size: 11px;
-    color: var(--text-tertiary);
+    color: #7dd3fc;
     margin-bottom: 4px;
     display: block;
 }
@@ -1429,34 +1449,40 @@ body {
 .workflow-dropdown {
     flex: 1;
     padding: 8px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-primary);
+    background: rgba(30, 58, 138, 0.3);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 8px;
+    color: #bfdbfe;
     font-size: 13px;
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
 .workflow-dropdown:focus {
     outline: none;
-    border-color: var(--accent-color);
+    border-color: #60a5fa;
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.2);
 }
 
 .refresh-btn {
     padding: 8px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    color: var(--text-secondary);
+    background: rgba(30, 58, 138, 0.3);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 8px;
+    color: #93c5fd;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s ease;
 }
 
 .refresh-btn:hover {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
+    background: rgba(59, 130, 246, 0.3);
+    color: #60a5fa;
+    border-color: #60a5fa;
+    box-shadow: 0 0 15px rgba(96, 165, 250, 0.2);
+    transform: scale(1.05);
 }
 
 /* Executions Section */
