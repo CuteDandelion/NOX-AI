@@ -1284,8 +1284,8 @@ class NOXApp {
         // Close selector menu
         document.getElementById('skillSelectorMenu').style.display = 'none';
 
-        // Check if skill has parameters
-        const parameters = this.extractParametersFromCypher(skill.cypher_template);
+        // Check if skill has parameters (new schema)
+        const parameters = this.extractParametersFromSkill(skill);
 
         if (parameters.length > 0) {
             // Open parameter wizard
@@ -1296,21 +1296,36 @@ class NOXApp {
         }
     }
 
-    extractParametersFromCypher(cypherTemplate) {
-        // Extract $paramName from Cypher template
-        const paramRegex = /\$(\w+)/g;
+    extractParametersFromSkill(skill) {
+        // New schema: parameters is a JSON object
         const params = [];
-        let match;
 
-        while ((match = paramRegex.exec(cypherTemplate)) !== null) {
-            const paramName = match[1];
-            if (!params.find(p => p.name === paramName)) {
+        try {
+            let parametersObj = skill.parameters;
+
+            // If parameters is a JSON string, parse it
+            if (typeof parametersObj === 'string') {
+                parametersObj = JSON.parse(parametersObj);
+            }
+
+            // If no parameters object, return empty array
+            if (!parametersObj || typeof parametersObj !== 'object') {
+                return params;
+            }
+
+            // Convert parameters object to array format for wizard
+            for (const [paramName, paramConfig] of Object.entries(parametersObj)) {
                 params.push({
                     name: paramName,
-                    required: true,
-                    hint: `Value for ${paramName}`
+                    required: paramConfig.required !== false, // Default to true
+                    hint: paramConfig.description || `Enter ${paramName}`,
+                    type: paramConfig.type || 'string',
+                    default: paramConfig.default
                 });
             }
+
+        } catch (error) {
+            console.warn('Failed to extract parameters from skill:', error);
         }
 
         return params;
@@ -1367,7 +1382,7 @@ class NOXApp {
 
             const label = document.createElement('label');
             label.className = 'wizard-param-label';
-            label.textContent = param.name;
+            label.textContent = param.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             if (param.required) {
                 const required = document.createElement('span');
                 required.className = 'required';
@@ -1375,23 +1390,52 @@ class NOXApp {
                 label.appendChild(required);
             }
 
-            const input = document.createElement('input');
-            input.type = 'text';
+            // Create input based on type
+            let input;
+            const paramType = param.type || 'string';
+
+            if (paramType === 'number' || paramType === 'integer') {
+                input = document.createElement('input');
+                input.type = 'number';
+                if (paramType === 'integer') {
+                    input.step = '1';
+                }
+            } else if (paramType === 'boolean') {
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = param.default === true;
+            } else if (paramType === 'textarea' || paramType === 'text') {
+                input = document.createElement('textarea');
+                input.rows = 3;
+            } else {
+                // Default to text input
+                input = document.createElement('input');
+                input.type = 'text';
+            }
+
             input.className = 'wizard-param-input';
             input.id = `wizard-param-${param.name}`;
-            input.placeholder = `Enter ${param.name}...`;
             input.required = param.required;
 
+            // Set placeholder or default value
+            if (paramType === 'boolean') {
+                // Checkbox doesn't need placeholder
+            } else {
+                input.placeholder = `Enter ${param.name.replace(/_/g, ' ')}...`;
+                if (param.default !== undefined && param.default !== null) {
+                    input.value = param.default;
+                }
+            }
+
+            group.appendChild(label);
+            group.appendChild(input);
+
+            // Add hint if available
             if (param.hint) {
                 const hint = document.createElement('div');
                 hint.className = 'wizard-param-hint';
                 hint.textContent = param.hint;
-                group.appendChild(label);
-                group.appendChild(input);
                 group.appendChild(hint);
-            } else {
-                group.appendChild(label);
-                group.appendChild(input);
             }
 
             formEl.appendChild(group);
@@ -1411,18 +1455,38 @@ class NOXApp {
         let isValid = true;
         inputs.forEach(input => {
             const paramName = input.id.replace('wizard-param-', '');
-            const value = input.value.trim();
+            let value;
 
-            if (input.required && !value) {
-                input.style.borderColor = '#ff6b6b';
-                isValid = false;
-            } else {
-                input.style.borderColor = '';
+            // Handle different input types
+            if (input.type === 'checkbox') {
+                value = input.checked;
                 paramValues[paramName] = value;
+            } else if (input.type === 'number') {
+                value = input.value.trim();
+                if (input.required && !value) {
+                    input.style.borderColor = '#ff6b6b';
+                    isValid = false;
+                    return;
+                }
+                paramValues[paramName] = value ? parseFloat(value) : '';
+                input.style.borderColor = '';
+            } else {
+                value = input.value.trim();
+                if (input.required && !value) {
+                    input.style.borderColor = '#ff6b6b';
+                    isValid = false;
+                    return;
+                }
+                paramValues[paramName] = value;
+                input.style.borderColor = '';
             }
         });
 
         if (!isValid) {
+            this.notificationManager.warning(
+                'Missing Required Fields',
+                'Please fill in all required parameters'
+            );
             return;
         }
 

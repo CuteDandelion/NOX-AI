@@ -3101,6 +3101,33 @@ body {
     font-style: italic;
 }
 
+/* Checkbox inputs */
+.wizard-param-input[type="checkbox"] {
+    width: auto;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+/* Textarea inputs */
+.wizard-param-input[type="textarea"],
+textarea.wizard-param-input {
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+/* Number inputs */
+.wizard-param-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.wizard-param-input[type="number"]::-webkit-outer-spin-button,
+.wizard-param-input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 /* ==================== Welcome Screen ==================== */
 
 .welcome-screen {
