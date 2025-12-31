@@ -938,20 +938,29 @@ class NOXApp {
         const modal = document.getElementById('editSkillModal');
         const jsonEditor = document.getElementById('editSkillJSON');
 
-        // Prepare skill object for editing
+        // Prepare skill object for editing - match actual Neo4j schema
         const editableSkill = {
             id: skill.id,
             name: skill.name || '',
             description: skill.description || '',
-            category: skill.category || '',
+            workflow_template: skill.workflow_template || {},
             triggers: skill.triggers || [],
-            cypher_template: skill.cypher_template || '',
-            parameters: skill.parameters || '{}',
-            usage_count: skill.usage_count || 0,
+            category: skill.category || '',
+            parameters: skill.parameters || {},
             version: skill.version || 1,
+            usage_count: skill.usage_count || 0,
             created_at: skill.created_at || '',
             updated_at: skill.updated_at || ''
         };
+
+        // Parse workflow_template if it's a string
+        try {
+            if (typeof editableSkill.workflow_template === 'string') {
+                editableSkill.workflow_template = JSON.parse(editableSkill.workflow_template);
+            }
+        } catch (error) {
+            editableSkill.workflow_template = {};
+        }
 
         // Parse parameters if it's a string
         try {
@@ -995,8 +1004,8 @@ class NOXApp {
                 return;
             }
 
-            if (!skillData.cypher_template || !skillData.cypher_template.trim()) {
-                this.showEditSkillErrors(['Cypher template is required']);
+            if (!skillData.workflow_template) {
+                this.showEditSkillErrors(['Workflow template is required']);
                 return;
             }
 
@@ -1006,7 +1015,7 @@ class NOXApp {
                 description: (skillData.description || '').trim(),
                 category: (skillData.category || '').trim(),
                 triggers: skillData.triggers || [],
-                cypher_template: skillData.cypher_template.trim(),
+                workflow_template: skillData.workflow_template,
                 parameters: skillData.parameters || {}
             };
 
