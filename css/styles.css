@@ -464,13 +464,13 @@ body {
 
 /* Assistant message styling */
 .message.assistant-message {
-    justify-content: flex-start;
+    margin-right: auto;
 }
 
 /* User message styling */
 .message.user-message {
     flex-direction: row-reverse;
-    justify-content: flex-end;
+    margin-left: auto;
 }
 
 .message.user-message .message-content {
@@ -3207,7 +3207,7 @@ body {
 }
 
 .chat-section.bottom .chat-messages {
-    display: flex;
+    display: block;
 }
 
 .chat-section.bottom .chat-input-container {
