@@ -21,6 +21,9 @@ class NOXApp {
         this.files = [];
         this.currentFilePreviewData = null; // Store file preview info for chat display
 
+        // Reply context
+        this.replyContext = null;
+
         // Workflow monitoring
         this.workflowSelect = null;
         this.executionsList = null;
@@ -195,6 +198,12 @@ class NOXApp {
 
         // Reset Chat
         document.getElementById('resetChatBtn').addEventListener('click', () => this.resetChat());
+
+        // Reply context clear button
+        const clearReplyBtn = document.getElementById('clearReplyBtn');
+        if (clearReplyBtn) {
+            clearReplyBtn.addEventListener('click', () => this.clearReplyContext());
+        }
 
         // Streaming Speed
         this.setupStreamingSpeed();
@@ -2235,8 +2244,16 @@ class NOXApp {
             // Convert files to base64 if needed
             const fileData = await this.prepareFilesForUpload(filesToSend);
 
+            // Prepare message with context if replying
+            let messageToSend = message;
+            if (this.replyContext) {
+                messageToSend = `[Replying to: "${this.replyContext}"]\n\n${message}`;
+                // Clear reply context after using it
+                this.clearReplyContext();
+            }
+
             // Send to n8n
-            const response = await n8nManager.sendMessage(message, fileData);
+            const response = await n8nManager.sendMessage(messageToSend, fileData);
 
             // Remove loading
             this.removeMessage(loadingId);
@@ -2525,16 +2542,68 @@ class NOXApp {
                     ${filePreviewHTML}
                     <div class="message-text">${this.formatMessageContent(message.content)}</div>
                 </div>
+                ${message.role === 'assistant' ? `
+                    <button class="message-reply-btn" title="Reply to this message" aria-label="Reply">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 14l-4 4m0 0l4 4m-4-4h11a4 4 0 004-4V6"></path>
+                        </svg>
+                    </button>
+                ` : ''}
             `;
         }
 
         this.chatMessages.appendChild(messageEl);
+
+        // Add reply button handler for assistant messages
+        if (message.role === 'assistant') {
+            const replyBtn = messageEl.querySelector('.message-reply-btn');
+            if (replyBtn) {
+                replyBtn.addEventListener('click', () => {
+                    this.setReplyContext(message.content);
+                });
+            }
+        }
 
         // Apply syntax highlighting and setup copy buttons
         this.highlightCode();
         this.setupCodeCopyButtons();
 
         this.scrollToBottom();
+    }
+
+    setReplyContext(content) {
+        this.replyContext = content;
+
+        const replyPreview = document.getElementById('replyPreview');
+        const replyText = document.getElementById('replyText');
+
+        if (replyPreview && replyText) {
+            // Truncate long messages
+            const maxLength = 100;
+            const displayText = content.length > maxLength
+                ? content.substring(0, maxLength) + '...'
+                : content;
+
+            // Strip HTML tags for preview
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = displayText;
+            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+
+            replyText.textContent = plainText;
+            replyPreview.classList.remove('hidden');
+
+            // Focus on input
+            this.chatInput.focus();
+        }
+    }
+
+    clearReplyContext() {
+        this.replyContext = null;
+
+        const replyPreview = document.getElementById('replyPreview');
+        if (replyPreview) {
+            replyPreview.classList.add('hidden');
+        }
     }
 
     addSystemMessage(content) {
