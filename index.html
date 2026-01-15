@@ -188,37 +188,60 @@
 
                     <!-- Chat Input -->
                     <div class="chat-input-container">
+                        <!-- Reply Context Preview -->
+                        <div id="replyPreview" class="reply-preview hidden">
+                            <div class="reply-preview-content">
+                                <div class="reply-preview-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 14l-4 4m0 0l4 4m-4-4h11a4 4 0 004-4V6"></path>
+                                    </svg>
+                                </div>
+                                <div class="reply-preview-info">
+                                    <div class="reply-preview-label">Replying to NOX.AI</div>
+                                    <div id="replyText" class="reply-preview-text"></div>
+                                </div>
+                                <button id="clearReplyBtn" class="reply-preview-close" title="Cancel reply">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Attached Files Preview - Inline -->
                         <div id="attachedFiles" class="attached-files" style="display: none;"></div>
 
                         <!-- Skill Chips Container -->
                         <div id="skillChips" class="skill-chips-container" style="display: none;"></div>
 
-                        <div class="input-actions">
-                            <button id="attachButton" class="action-button" title="Attach file or image">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
-                                </svg>
-                            </button>
-                            <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.html,.md,.json,.csv" style="display: none;">
-                        </div>
-                        <div class="chat-input-wrapper">
-                            <textarea
-                                id="chatInput"
-                                class="chat-input"
-                                placeholder="Message NOX.AI..."
-                                rows="1"
-                                autocomplete="off"
-                                autocorrect="off"
-                                autocapitalize="off"
-                                spellcheck="false"
-                                data-form-type="other"
-                                data-lpignore="true"
-                                data-1p-ignore="true"
-                            ></textarea>
-                            <div id="inlineGhostText" class="inline-ghost-text"></div>
-                        </div>
-                        <div class="input-actions">
+                        <!-- Input Row with all controls -->
+                        <div class="chat-input-row">
+                            <div class="input-actions">
+                                <button id="attachButton" class="action-button" title="Attach file or image">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
+                                    </svg>
+                                </button>
+                                <input type="file" id="fileInput" accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.html,.md,.json,.csv" style="display: none;">
+                            </div>
+                            <div class="chat-input-wrapper">
+                                <textarea
+                                    id="chatInput"
+                                    class="chat-input"
+                                    placeholder="Message NOX.AI..."
+                                    rows="1"
+                                    autocomplete="off"
+                                    autocorrect="off"
+                                    autocapitalize="off"
+                                    spellcheck="false"
+                                    data-form-type="other"
+                                    data-lpignore="true"
+                                    data-1p-ignore="true"
+                                ></textarea>
+                                <div id="inlineGhostText" class="inline-ghost-text"></div>
+                            </div>
+                            <div class="input-actions">
                             <button id="skillSelectorButton" class="action-button" title="Use Skill">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -239,6 +262,7 @@
                                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
                                 </svg>
                             </button>
+                        </div>
                         </div>
                     </div>
 
