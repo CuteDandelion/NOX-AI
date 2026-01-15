@@ -379,6 +379,7 @@ body {
 
 /* Messages */
 .message {
+    position: relative;
     display: flex;
     margin-bottom: 28px;
     gap: 14px;
