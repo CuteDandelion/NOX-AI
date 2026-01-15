@@ -23,6 +23,8 @@ class NOXApp {
 
         // Reply context
         this.replyContext = null;
+        this.focusedMessageIndex = -1; // Track focused message for keyboard nav
+        this.selectedMessageElement = null; // Track selected message element
 
         // Workflow monitoring
         this.workflowSelect = null;
@@ -204,6 +206,9 @@ class NOXApp {
         if (clearReplyBtn) {
             clearReplyBtn.addEventListener('click', () => this.clearReplyContext());
         }
+
+        // Keyboard navigation for reply context
+        document.addEventListener('keydown', (e) => this.handleKeyboardNavigation(e));
 
         // Streaming Speed
         this.setupStreamingSpeed();
@@ -2559,6 +2564,14 @@ class NOXApp {
             const replyBtn = messageEl.querySelector('.message-reply-btn');
             if (replyBtn) {
                 replyBtn.addEventListener('click', () => {
+                    // Remove previous selection
+                    if (this.selectedMessageElement) {
+                        this.selectedMessageElement.classList.remove('message-selected');
+                    }
+                    // Mark this message as selected
+                    messageEl.classList.add('message-selected');
+                    this.selectedMessageElement = messageEl;
+                    // Set as reply context
                     this.setReplyContext(message.content);
                 });
             }
@@ -2604,6 +2617,106 @@ class NOXApp {
         if (replyPreview) {
             replyPreview.classList.add('hidden');
         }
+
+        // Remove selected indicator
+        if (this.selectedMessageElement) {
+            this.selectedMessageElement.classList.remove('message-selected');
+            this.selectedMessageElement = null;
+        }
+
+        // Clear focused state
+        this.focusedMessageIndex = -1;
+        const focused = document.querySelector('.message-focused');
+        if (focused) {
+            focused.classList.remove('message-focused');
+        }
+    }
+
+    handleKeyboardNavigation(e) {
+        // Don't interfere when typing in input fields
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+            // Only allow Escape to work in input fields
+            if (e.key === 'Escape' && this.replyContext) {
+                e.preventDefault();
+                this.clearReplyContext();
+            }
+            return;
+        }
+
+        const assistantMessages = this.getAssistantMessages();
+        if (assistantMessages.length === 0) return;
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                this.focusedMessageIndex = Math.min(
+                    this.focusedMessageIndex + 1,
+                    assistantMessages.length - 1
+                );
+                this.focusMessage(assistantMessages[this.focusedMessageIndex]);
+                break;
+
+            case 'ArrowUp':
+                e.preventDefault();
+                if (this.focusedMessageIndex === -1) {
+                    this.focusedMessageIndex = assistantMessages.length - 1;
+                } else {
+                    this.focusedMessageIndex = Math.max(this.focusedMessageIndex - 1, 0);
+                }
+                this.focusMessage(assistantMessages[this.focusedMessageIndex]);
+                break;
+
+            case 'ArrowRight':
+                e.preventDefault();
+                if (this.focusedMessageIndex >= 0) {
+                    this.selectMessageAsContext(assistantMessages[this.focusedMessageIndex]);
+                }
+                break;
+
+            case 'Escape':
+                e.preventDefault();
+                this.clearReplyContext();
+                break;
+        }
+    }
+
+    getAssistantMessages() {
+        return Array.from(this.chatMessages.querySelectorAll('.message.assistant-message'))
+            .filter(msg => !msg.id.startsWith('loading_')); // Exclude loading messages
+    }
+
+    focusMessage(messageElement) {
+        // Remove previous focus
+        const prevFocused = document.querySelector('.message-focused');
+        if (prevFocused) {
+            prevFocused.classList.remove('message-focused');
+        }
+
+        // Add focus to new message
+        messageElement.classList.add('message-focused');
+
+        // Scroll into view
+        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    selectMessageAsContext(messageElement) {
+        // Get the message content
+        const messageText = messageElement.querySelector('.message-text');
+        if (!messageText) return;
+
+        const content = messageText.textContent;
+
+        // Remove previous selection indicator
+        if (this.selectedMessageElement) {
+            this.selectedMessageElement.classList.remove('message-selected');
+        }
+
+        // Add selection indicator to new message
+        messageElement.classList.add('message-selected');
+        this.selectedMessageElement = messageElement;
+
+        // Set as reply context
+        this.setReplyContext(content);
     }
 
     addSystemMessage(content) {
